@@ -1,0 +1,871 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model academic_years {
+  id               String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id        String?             @db.Uuid
+  label            String              @db.VarChar(10)
+  is_active        Boolean?            @default(false)
+  start_date       DateTime?           @db.Date
+  end_date         DateTime?           @db.Date
+  schools          schools?            @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods academic_periods[]
+  fee_definitions  fee_definitions[]
+  grade_subjects   grade_subjects[]
+  sections         sections[]
+  student_benefits student_benefits[]
+  student_piars    student_piars[]
+
+  @@unique([school_id, label])
+}
+
+model academic_periods {
+  id                String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id         String           @db.Uuid
+  academic_year_id  String           @db.Uuid
+  name              String           @db.VarChar(100)
+  period_number     Int              @db.SmallInt
+  start_date        DateTime         @db.Date
+  end_date          DateTime         @db.Date
+  sort_order        Int              @default(0) @db.SmallInt
+  weight_percentage Decimal?         @db.Decimal(5,2)
+  created_at        DateTime?        @default(now()) @db.Timestamptz(6)
+  schools           schools          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_years    academic_years   @relation(fields: [academic_year_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_grades               student_grades[]
+  period_achievements          period_achievements[]
+  student_period_absences      student_period_absences[]
+  student_area_grades          student_area_grades[]
+  student_area_grade_items     student_area_grade_items[]
+  preschool_dimension_grades   preschool_dimension_grades[]
+  preschool_indicator_grades   preschool_indicator_grades[]
+  student_convivencia_grades   student_convivencia_grades[]
+
+  @@unique([academic_year_id, period_number])
+  @@index([school_id])
+  @@index([academic_year_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model benefit_types {
+  id               String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id        String?            @db.Uuid
+  name             String             @db.VarChar(100)
+  origin           String?            @db.VarChar(20)
+  description      String?
+  created_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  schools          schools?           @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_benefits student_benefits[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model enrollments {
+  id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  student_id         String?   @db.Uuid
+  section_id         String?   @db.Uuid
+  enrollment_date    DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  status             String?   @default("ACTIVE") @db.VarChar(20)
+  academic_result    String?   @db.VarChar(20)
+  saber11_score      Int?
+  student_signature  String?
+  guardian_signature String?
+  rector_signature   String?
+  sections                 sections?                 @relation(fields: [section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  students                 students?                 @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_grades               student_grades[]
+  student_period_absences      student_period_absences[]
+  student_area_grades          student_area_grades[]
+  student_area_grade_items     student_area_grade_items[]
+  preschool_dimension_grades   preschool_dimension_grades[]
+  preschool_indicator_grades   preschool_indicator_grades[]
+  student_convivencia_grades   student_convivencia_grades[]
+
+  @@unique([student_id, section_id])
+}
+
+model fee_definitions {
+  id               String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id        String           @db.Uuid
+  academic_year_id String           @db.Uuid
+  grade_id         String           @db.Uuid
+  concept_name     String           @db.VarChar(100)
+  base_amount      Decimal          @db.Decimal(15, 2)
+  is_recurring     Boolean?         @default(true)
+  due_day_of_month Int?             @default(5)
+  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  academic_years   academic_years   @relation(fields: [academic_year_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  grades           grades           @relation(fields: [grade_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  schools          schools          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_ledger   student_ledger[]
+
+  @@unique([school_id, academic_year_id, grade_id, concept_name])
+}
+
+model grades {
+  id              String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id       String?           @db.Uuid
+  name            String            @db.VarChar(50)
+  level           Int
+  jornada         String            @default("UNICA") @db.VarChar(20)
+  nivel_educativo String            @default("BASICA_PRIMARIA") @db.VarChar(30)
+  fee_definitions fee_definitions[]
+  schools         schools?          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sections        sections[]
+  grade_subjects       grade_subjects[]
+  subject_achievements subject_achievements[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model guardians {
+  id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id         String              @db.Uuid
+  first_name        String              @db.VarChar(100)
+  last_name         String              @db.VarChar(100)
+  document_type     String              @db.VarChar(10)
+  document_number   String              @db.VarChar(50)
+  email             String?             @db.VarChar(255)
+  phone_mobile      String              @db.VarChar(20)
+  phone_work        String?             @db.VarChar(20)
+  address           String?
+  occupation        String?             @db.VarChar(100)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  schools           schools             @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  parent_meetings   parent_meetings[]
+  student_guardians student_guardians[]
+
+  @@unique([school_id, document_number])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model parent_meetings {
+  id                 String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String     @db.Uuid
+  student_id         String     @db.Uuid
+  guardian_id        String?    @db.Uuid
+  created_by         String?    @db.Uuid
+  meeting_reason     String
+  scheduled_datetime DateTime   @db.Timestamptz(6)
+  status             String?    @default("SCHEDULED") @db.VarChar(20)
+  meeting_notes      String?
+  agreements         String?
+  guardian_signature String?
+  student_signature  String?
+  staff_signature    String?
+  location           String?    @default("Coordinación") @db.VarChar(100)
+  created_at         DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?  @default(now()) @db.Timestamptz(6)
+  users              users?     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  guardians          guardians? @relation(fields: [guardian_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  schools            schools    @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  students           students   @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([student_id], map: "idx_meetings_student")
+}
+
+model payments {
+  id             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id      String         @db.Uuid
+  ledger_id      String         @db.Uuid
+  transaction_id String         @db.Uuid
+  amount_paid    Decimal        @db.Decimal(15, 2)
+  payment_method String?        @db.VarChar(50)
+  payment_date   DateTime?      @default(dbgenerated("CURRENT_DATE")) @db.Date
+  is_partial     Boolean?       @default(false)
+  created_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  student_ledger student_ledger @relation(fields: [ledger_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  schools        schools        @relation(fields: [school_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transactions   transactions   @relation(fields: [transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model roles {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String    @unique @db.VarChar(50)
+  description String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  users       users[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model schools {
+  id                     String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                   String                   @db.VarChar(255)
+  nit                    String                   @unique @db.VarChar(50)
+  address                String?
+  city                   String?                  @default("Barranquilla") @db.VarChar(100)
+  phone                  String?                  @db.VarChar(20)
+  dane_code              String?                  @unique @db.VarChar(20)
+  calendar               String?                  @db.Char(1)
+  sector                 String?                  @default("PRIVADO") @db.VarChar(20)
+  logo                   String?
+  rector_name            String?                  @db.VarChar(150)
+  rector_signature       String?
+  resolution_number      String?                  @db.VarChar(100)
+  created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  academic_years          academic_years[]
+  academic_periods        academic_periods[]
+  benefit_types           benefit_types[]
+  grading_scale_config    grading_scale_config?
+  student_grades          student_grades[]
+  enrollment_doc_configs  enrollment_doc_configs[]
+  enrollment_uploads      enrollment_uploads[]
+  escalafon_types         escalafon_types[]
+  fee_definitions         fee_definitions[]
+  grades                  grades[]
+  grade_subjects          grade_subjects[]
+  guardians               guardians[]
+  parent_meetings         parent_meetings[]
+  payments                payments[]
+  service_fees            service_fees[]
+  student_ledger          student_ledger[]
+  students                students[]
+  subject_areas           subject_areas[]
+  subjects                subjects[]
+  teacher_contracts       teacher_contracts[]
+  teacher_hour_deductions teacher_hour_deductions[]
+  teachers                teachers[]
+  transactions            transactions[]
+  users                   users[]
+  subject_achievements     subject_achievements[]
+  period_achievements      period_achievements[]
+  student_period_absences  student_period_absences[]
+  student_area_grades      student_area_grades[]
+  student_area_grade_items student_area_grade_items[]
+  student_diagnoses            student_diagnoses[]
+  student_piars                student_piars[]
+  piar_adjustments             piar_adjustments[]
+  preschool_dimension_grades   preschool_dimension_grades[]
+  preschool_indicator_grades   preschool_indicator_grades[]
+  student_convivencia_grades   student_convivencia_grades[]
+}
+
+model service_fees {
+  id                     String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id              String           @db.Uuid
+  name                   String           @db.VarChar(100)
+  amount                 Decimal          @db.Decimal(15, 2)
+  applies_to_grade_level Int?
+  service_type           String           @default("SERVICIO") @db.VarChar(20)
+  is_active              Boolean          @default(true)
+  certificate_template   String?
+  created_at             DateTime?        @default(now()) @db.Timestamptz(6)
+  schools                schools          @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student_ledger         student_ledger[]
+
+  @@unique([school_id, name])
+}
+
+model sections {
+  id               String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  grade_id         String?         @db.Uuid
+  academic_year_id String?         @db.Uuid
+  name             String          @db.VarChar(10)
+  teacher_id       String?         @db.Uuid
+  director_id      String?         @db.Uuid
+  capacity         Int?            @default(30)
+  enrollments      enrollments[]
+  academic_years   academic_years? @relation(fields: [academic_year_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  grades           grades?         @relation(fields: [grade_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users            users?          @relation(fields: [teacher_id], references: [id], onUpdate: NoAction)
+  director         teachers?       @relation("section_director", fields: [director_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+}
+
+model student_benefits {
+  id                    String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  student_id            String?         @db.Uuid
+  benefit_type_id       String?         @db.Uuid
+  academic_year_id      String?         @db.Uuid
+  discount_percentage   Decimal?        @default(0) @db.Decimal(5, 2)
+  fixed_discount_amount Decimal?        @default(0) @db.Decimal(15, 2)
+  resolution_number     String?         @db.VarChar(100)
+  observations          String?
+  is_active             Boolean?        @default(true)
+  academic_years        academic_years? @relation(fields: [academic_year_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  benefit_types         benefit_types?  @relation(fields: [benefit_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  students              students?       @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([student_id, academic_year_id, benefit_type_id])
+}
+
+model student_guardians {
+  id                       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  student_id               String    @db.Uuid
+  guardian_id              String    @db.Uuid
+  relationship             String    @db.VarChar(50)
+  is_emergency_contact     Boolean?  @default(false)
+  is_financial_responsible Boolean?  @default(false)
+  lives_with_student       Boolean?  @default(true)
+  guardians                guardians @relation(fields: [guardian_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  students                 students  @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([student_id, guardian_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model student_ledger {
+  id                String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id         String           @db.Uuid
+  student_id        String           @db.Uuid
+  fee_definition_id String?          @db.Uuid
+  service_fee_id    String?          @db.Uuid
+  original_amount   Decimal          @db.Decimal(15, 2)
+  discount_applied  Decimal?         @default(0) @db.Decimal(15, 2)
+  net_amount_due    Decimal          @db.Decimal(15, 2)
+  billing_period    DateTime?        @db.Date
+  due_date          DateTime?        @db.Date
+  status            String?          @default("PENDING") @db.VarChar(20)
+  balance_remaining Decimal?         @db.Decimal(15, 2)
+  created_at        DateTime?        @default(now()) @db.Timestamptz(6)
+  payments          payments[]
+  fee_definitions   fee_definitions? @relation(fields: [fee_definition_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  service_fees      service_fees?    @relation(fields: [service_fee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  schools           schools          @relation(fields: [school_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  students          students         @relation(fields: [student_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model enrollment_doc_configs {
+  id           String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id    String               @db.Uuid
+  catalog_key  String?              @db.VarChar(50)
+  custom_name  String?              @db.VarChar(200)
+  is_required  Boolean              @default(true)
+  sort_order   Int                  @default(0)
+  is_active    Boolean              @default(true)
+  created_at   DateTime?            @default(now()) @db.Timestamptz(6)
+  schools      schools              @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  uploads      enrollment_uploads[]
+
+  @@unique([school_id, catalog_key])
+}
+
+model enrollment_uploads {
+  id                String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id         String                 @db.Uuid
+  student_id        String                 @db.Uuid
+  doc_config_id     String                 @db.Uuid
+  original_filename String                 @db.VarChar(255)
+  stored_path       String                 @db.VarChar(500)
+  file_size         Int
+  uploaded_at       DateTime?              @default(now()) @db.Timestamptz(6)
+  schools           schools                @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  students          students               @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  doc_config        enrollment_doc_configs @relation(fields: [doc_config_id], references: [id], onDelete: Cascade)
+}
+
+model students {
+  id                 String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String               @db.Uuid
+  first_name         String               @db.VarChar(100)
+  last_name          String               @db.VarChar(100)
+  document_type      String               @db.VarChar(10)
+  document_number    String               @db.VarChar(50)
+  exp_city           String?              @db.VarChar(100)
+  birth_date         DateTime?            @db.Date
+  birth_city         String?              @db.VarChar(100)
+  gender             String?              @db.Char(1)
+  blood_type         String?              @db.VarChar(5)
+  estrato            Int?
+  sisben_score       String?              @db.VarChar(20)
+  ethnicity          String?              @default("Ninguna") @db.VarChar(50)
+  status             String?              @default("PROSPECTIVE") @db.VarChar(20)
+  metadata           Json?                @default("{}")
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  enrollments        enrollments[]
+  enrollment_uploads enrollment_uploads[]
+  parent_meetings    parent_meetings[]
+  student_benefits   student_benefits[]
+  student_guardians  student_guardians[]
+  student_ledger     student_ledger[]
+  student_diagnoses  student_diagnoses[]
+  student_piars      student_piars[]
+  schools            schools              @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  transactions       transactions[]
+
+  @@unique([school_id, document_number])
+  @@index([document_number], map: "idx_students_document")
+  @@index([school_id], map: "idx_students_school")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model transactions {
+  id               String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id        String?    @db.Uuid
+  student_id       String?    @db.Uuid
+  type             String     @db.VarChar(10)
+  category         String     @db.VarChar(100)
+  amount           Decimal    @db.Decimal(15, 2)
+  description      String?
+  transaction_date DateTime?  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_by       String?    @db.Uuid
+  created_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  payments         payments[]
+  users            users?     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  schools          schools?   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  students         students?  @relation(fields: [student_id], references: [id], onUpdate: NoAction)
+}
+
+model users {
+  id              String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id       String?           @db.Uuid
+  full_name       String            @db.VarChar(255)
+  email           String            @unique @db.VarChar(255)
+  password_hash   String
+  role_id         String?           @db.Uuid
+  created_at      DateTime?         @default(now()) @db.Timestamptz(6)
+  parent_meetings parent_meetings[]
+  sections        sections[]
+  transactions    transactions[]
+  teachers        teachers?
+  roles           roles?            @relation(fields: [role_id], references: [id], onUpdate: NoAction)
+  schools         schools?          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// ── Módulo de Docentes ───────────────────────────────────
+
+model escalafon_types {
+  id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id         String              @db.Uuid
+  name              String              @db.VarChar(50)
+  hourly_rate       Decimal?            @db.Decimal(15, 2)
+  description       String?
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  schools           schools             @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  teachers          teachers[]
+  teacher_contracts teacher_contracts[]
+
+  @@unique([school_id, name])
+}
+
+model teachers {
+  id                        String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id                 String                    @db.Uuid
+  user_id                   String?                   @unique @db.Uuid
+  first_name                String                    @db.VarChar(100)
+  last_name                 String                    @db.VarChar(100)
+  document_type             String                    @db.VarChar(10)
+  document_number           String                    @db.VarChar(50)
+  address                   String?
+  phone_mobile              String?                   @db.VarChar(20)
+  escalafon_type_id         String?                   @db.Uuid
+  profession                String?                   @db.VarChar(100)
+  created_at                DateTime?                 @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime?                 @default(now()) @db.Timestamptz(6)
+  users                     users?                    @relation(fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  escalafon_types           escalafon_types?          @relation(fields: [escalafon_type_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  schools                   schools                   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  teacher_contracts         teacher_contracts[]
+  teacher_hour_deductions   teacher_hour_deductions[]
+  directed_sections         sections[]                @relation("section_director")
+  grade_subjects            grade_subjects[]
+
+  @@unique([school_id, document_number])
+  @@index([school_id], map: "idx_teachers_school")
+}
+
+model teacher_contracts {
+  id                        String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id                 String                      @db.Uuid
+  teacher_id                String                      @db.Uuid
+  escalafon_type_id         String                      @db.Uuid
+  start_date                DateTime                    @db.Date
+  end_date                  DateTime                    @db.Date
+  weekly_hours              Int
+  notes                     String?
+  created_at                DateTime?                   @default(now()) @db.Timestamptz(6)
+  escalafon_types           escalafon_types             @relation(fields: [escalafon_type_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  schools                   schools                     @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  teachers                  teachers                    @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  teacher_contract_subjects teacher_contract_subjects[]
+
+  @@index([teacher_id], map: "idx_teacher_contracts_teacher")
+  @@index([school_id],  map: "idx_teacher_contracts_school")
+}
+
+model teacher_contract_subjects {
+  id               String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  contract_id      String           @db.Uuid
+  subject_id       String           @db.Uuid
+  teacher_contracts teacher_contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+  subjects          subjects          @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@unique([contract_id, subject_id])
+  @@index([contract_id], map: "idx_tcs_contract")
+  @@index([subject_id],  map: "idx_tcs_subject")
+}
+
+model teacher_hour_deductions {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id      String   @db.Uuid
+  teacher_id     String   @db.Uuid
+  year           Int
+  month          Int
+  deduction_date DateTime @db.Date
+  hours          Decimal  @db.Decimal(5, 2)
+  reason         String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  schools        schools  @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  teachers       teachers @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([school_id, teacher_id, year, month], map: "idx_thr_ded_school_teacher_month")
+}
+
+// ── Módulo Plan de Estudios ──────────────────────────────────────────────────
+
+model subject_areas {
+  id         String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id  String     @db.Uuid
+  name       String     @db.VarChar(150)
+  sort_order Int        @default(0) @db.SmallInt
+  is_active  Boolean    @default(true)
+  created_at DateTime?  @default(now()) @db.Timestamptz(6)
+  schools             schools               @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  subjects            subjects[]
+  student_area_grades      student_area_grades[]
+  student_area_grade_items student_area_grade_items[]
+  piar_adjustments         piar_adjustments[]
+
+  @@unique([school_id, name])
+  @@index([school_id])
+}
+
+model subjects {
+  id             String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id      String           @db.Uuid
+  area_id        String           @db.Uuid
+  name           String           @db.VarChar(150)
+  sort_order     Int              @default(0) @db.SmallInt
+  is_active      Boolean          @default(true)
+  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  schools                   schools                     @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  subject_areas             subject_areas               @relation(fields: [area_id], references: [id], onDelete: Cascade)
+  grade_subjects            grade_subjects[]
+  teacher_contract_subjects teacher_contract_subjects[]
+  student_grades            student_grades[]
+  subject_achievements      subject_achievements[]
+
+  @@unique([area_id, name])
+  @@index([school_id])
+  @@index([area_id])
+}
+
+model grade_subjects {
+  id               String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id        String          @db.Uuid
+  grade_id         String          @db.Uuid
+  subject_id       String          @db.Uuid
+  teacher_id       String?         @db.Uuid
+  academic_year_id String?         @db.Uuid
+  weekly_hours     Int?            @db.SmallInt
+  created_at       DateTime?       @default(now()) @db.Timestamptz(6)
+  schools          schools         @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  grades           grades          @relation(fields: [grade_id], references: [id], onDelete: Cascade)
+  subjects         subjects        @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teachers         teachers?       @relation(fields: [teacher_id], references: [id], onDelete: SetNull)
+  academic_years   academic_years? @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([grade_id])
+  @@index([academic_year_id])
+}
+
+// ── Módulo Registro Académico ────────────────────────────────────────────────
+
+model grading_scale_config {
+  id                   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id            String    @unique @db.Uuid
+  scale_type           String    @default("NUMERIC") @db.VarChar(20)
+  cumulative           Boolean   @default(true)
+  bulletin_header      String    @default("LOGO_LEFT") @db.VarChar(20)
+  include_achievements Boolean   @default(true)
+  secondary_logo       String?
+  include_convivencia  Boolean   @default(false)
+  convivencia_scale    String    @default("QUALITATIVE") @db.VarChar(20)
+  bulletin_header_html String?
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+  schools              schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model student_grades {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  enrollment_id      String           @db.Uuid
+  subject_id         String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  numeric_grade      Decimal?         @db.Decimal(4,2)
+  qualitative_grade  String?          @db.VarChar(5)
+  notes              String?
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments        enrollments      @relation(fields: [enrollment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subjects           subjects         @relation(fields: [subject_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([enrollment_id, subject_id, academic_period_id])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model student_area_grades {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  enrollment_id      String           @db.Uuid
+  subject_area_id    String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  points             Int              @db.SmallInt
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments        enrollments      @relation(fields: [enrollment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject_areas      subject_areas    @relation(fields: [subject_area_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([enrollment_id, subject_area_id, academic_period_id])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model student_area_grade_items {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  enrollment_id      String           @db.Uuid
+  subject_area_id    String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  item_key           String           @db.VarChar(60)
+  points             Int              @db.SmallInt
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments        enrollments      @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject_areas      subject_areas    @relation(fields: [subject_area_id],    references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([enrollment_id, subject_area_id, academic_period_id, item_key])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+}
+
+// ── Módulo Logros ────────────────────────────────────────────────────────────
+
+model subject_achievements {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id   String    @db.Uuid
+  subject_id  String    @db.Uuid
+  grade_id    String    @db.Uuid
+  code        String    @db.VarChar(5)
+  description String
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  schools     schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subjects    subjects  @relation(fields: [subject_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  grades      grades    @relation(fields: [grade_id],   references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([school_id, code])
+  @@index([school_id])
+  @@index([subject_id])
+  @@index([grade_id])
+  period_achievements  period_achievements[]
+}
+
+model period_achievements {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  achievement_id     String           @db.Uuid
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject_achievements subject_achievements @relation(fields: [achievement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([academic_period_id, achievement_id])
+  @@index([school_id])
+  @@index([academic_period_id])
+  @@index([achievement_id])
+}
+
+model student_period_absences {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  enrollment_id      String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  absences           Int              @default(0)
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments        enrollments      @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([enrollment_id, academic_period_id])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+}
+
+// ── Módulo Calificación Preescolar ───────────────────────────────────────────
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model preschool_dimension_grades {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  enrollment_id      String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  dimension          String           @db.VarChar(20)
+  rating             String           @db.VarChar(20)
+  notes              String?
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments        enrollments      @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([enrollment_id, academic_period_id, dimension])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model preschool_indicator_grades {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  enrollment_id      String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  dimension          String           @db.VarChar(20)
+  indicator_key      String           @db.VarChar(60)
+  rating             String           @db.VarChar(20)
+  notes              String?
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments        enrollments      @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([enrollment_id, academic_period_id, dimension, indicator_key])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+}
+
+// ── Módulo Convivencia ───────────────────────────────────────────────────────
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model student_convivencia_grades {
+  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String           @db.Uuid
+  enrollment_id      String           @db.Uuid
+  academic_period_id String           @db.Uuid
+  qualitative_grade  String?          @db.VarChar(5)
+  numeric_grade      Decimal?         @db.Decimal(4,2)
+  notes              String?
+  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
+  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments        enrollments      @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([enrollment_id, academic_period_id])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+}
+
+// ── Módulo Diagnósticos y PIAR ───────────────────────────────────────────────
+
+model diagnosis_categories {
+  id              String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  code            String            @unique @db.VarChar(30)
+  label           String            @db.VarChar(100)
+  sort_order      Int               @default(0) @db.SmallInt
+  diagnosis_types diagnosis_types[]
+}
+
+model diagnosis_types {
+  id                   String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  category_id          String                @db.Uuid
+  code                 String                @unique @db.VarChar(40)
+  label                String                @db.VarChar(200)
+  sort_order           Int                   @default(0) @db.SmallInt
+  diagnosis_categories diagnosis_categories  @relation(fields: [category_id], references: [id], onDelete: Cascade,  onUpdate: NoAction)
+  student_diagnoses    student_diagnoses[]
+}
+
+model student_diagnoses {
+  id                String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id         String          @db.Uuid
+  student_id        String          @db.Uuid
+  diagnosis_type_id String          @db.Uuid
+  cie_code          String?         @db.VarChar(20)
+  diagnosed_by      String?         @db.VarChar(150)
+  diagnosis_date    DateTime?       @db.Date
+  document_path     String?         @db.VarChar(500)
+  document_filename String?         @db.VarChar(255)
+  notes             String?
+  created_at        DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?       @default(now()) @db.Timestamptz(6)
+  schools           schools         @relation(fields: [school_id],         references: [id], onDelete: Cascade,  onUpdate: NoAction)
+  students          students        @relation(fields: [student_id],        references: [id], onDelete: Cascade,  onUpdate: NoAction)
+  diagnosis_types   diagnosis_types @relation(fields: [diagnosis_type_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([school_id])
+  @@index([student_id])
+  @@index([diagnosis_type_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model student_piars {
+  id                        String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id                 String           @db.Uuid
+  student_id                String           @db.Uuid
+  academic_year_id          String           @db.Uuid
+  pedagogical_strengths     String?
+  pedagogical_barriers      String?
+  environmental_adjustments String?
+  school_commitment         String?
+  family_commitment         String?
+  student_commitment        String?
+  status                    String           @default("ACTIVE") @db.VarChar(20)
+  created_at                DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime?        @default(now()) @db.Timestamptz(6)
+  schools                   schools          @relation(fields: [school_id],        references: [id], onDelete: Cascade, onUpdate: NoAction)
+  students                  students         @relation(fields: [student_id],       references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_years            academic_years   @relation(fields: [academic_year_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  piar_adjustments          piar_adjustments[]
+
+  @@unique([student_id, academic_year_id])
+  @@index([school_id])
+  @@index([student_id])
+  @@index([academic_year_id])
+}
+
+model piar_adjustments {
+  id               String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  piar_id          String         @db.Uuid
+  school_id        String         @db.Uuid
+  subject_area_id  String?        @db.Uuid
+  area_label       String?        @db.VarChar(150)
+  sort_order       Int            @default(0) @db.SmallInt
+  objectives       String?
+  barriers         String?
+  adjustments      String?
+  evaluation_notes String?
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  student_piars    student_piars  @relation(fields: [piar_id],         references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools          schools        @relation(fields: [school_id],       references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject_areas    subject_areas? @relation(fields: [subject_area_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([piar_id])
+  @@index([school_id])
+}

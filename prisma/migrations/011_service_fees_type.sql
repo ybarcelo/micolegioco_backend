@@ -1,0 +1,2 @@
+ALTER TABLE service_fees
+  ADD COLUMN service_type VARCHAR(20) NOT NULL DEFAULT 'SERVICIO';
