@@ -115,6 +115,11 @@ export class StudentDocumentsController {
       file_size: upload.file_size,
       uploaded_at: upload.uploaded_at,
       download_url: this.storage.publicPath(upload.stored_path),
+      doc_config: {
+        id: docConfig.id,
+        label: docConfig.catalog_key ? catalogLabel(docConfig.catalog_key) : docConfig.custom_name,
+        is_required: docConfig.is_required,
+      },
     }
   }
 

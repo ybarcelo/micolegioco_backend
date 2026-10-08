@@ -66,6 +66,17 @@ export class SectionsController {
     })
     if (!academicYear) throw new NotFoundException('Academic year not found')
 
+    if (grade.single_section) {
+      const existingCount = await this.prisma.sections.count({
+        where: { grade_id: body.grade_id, academic_year_id: body.academic_year_id },
+      })
+      if (existingCount > 0) {
+        throw new ConflictException(
+          'Este grado está configurado como sección única; ya existe una sección para este año académico',
+        )
+      }
+    }
+
     if (body.director_id) {
       const t = await this.prisma.teachers.findFirst({ where: { id: body.director_id, school_id: user.school_id } })
       if (!t) throw new BadRequestException('Docente no encontrado')
@@ -107,6 +118,27 @@ export class SectionsController {
       where: { id, grades: { school_id: user.school_id } },
     })
     if (!section) throw new NotFoundException('Section not found')
+
+    const targetGradeId = body.grade_id ?? section.grade_id
+    const targetYearId  = body.academic_year_id ?? section.academic_year_id
+
+    if (targetGradeId && targetYearId) {
+      const grade = await this.prisma.grades.findFirst({
+        where: { id: targetGradeId, school_id: user.school_id },
+      })
+      if (!grade) throw new NotFoundException('Grade not found')
+
+      if (grade.single_section) {
+        const existingCount = await this.prisma.sections.count({
+          where: { grade_id: targetGradeId, academic_year_id: targetYearId, id: { not: id } },
+        })
+        if (existingCount > 0) {
+          throw new ConflictException(
+            'Este grado está configurado como sección única; ya existe otra sección para este año académico',
+          )
+        }
+      }
+    }
 
     if (body.director_id) {
       const t = await this.prisma.teachers.findFirst({ where: { id: body.director_id, school_id: user.school_id } })

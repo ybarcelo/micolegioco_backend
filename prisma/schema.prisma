@@ -114,11 +114,13 @@ model grades {
   level           Int
   jornada         String            @default("UNICA") @db.VarChar(20)
   nivel_educativo String            @default("BASICA_PRIMARIA") @db.VarChar(30)
+  single_section  Boolean           @default(false)
   fee_definitions fee_definitions[]
   schools         schools?          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   sections        sections[]
   grade_subjects       grade_subjects[]
   subject_achievements subject_achievements[]
+  students             students[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -206,6 +208,10 @@ model schools {
   rector_name            String?                  @db.VarChar(150)
   rector_signature       String?
   resolution_number      String?                  @db.VarChar(100)
+  slug                   String?                  @unique @db.VarChar(100)
+  privacy_policy_url     String?                  @db.VarChar(500)
+  enrollment_opens_at    DateTime?                @db.Date
+  enrollment_closes_at   DateTime?                @db.Date
   created_at             DateTime?                @default(now()) @db.Timestamptz(6)
   academic_years          academic_years[]
   academic_periods        academic_periods[]
@@ -374,6 +380,8 @@ model students {
   ethnicity          String?              @default("Ninguna") @db.VarChar(50)
   status             String?              @default("PROSPECTIVE") @db.VarChar(20)
   metadata           Json?                @default("{}")
+  data_policy_accepted_at DateTime?       @db.Timestamptz(6)
+  aspired_grade_id   String?              @db.Uuid
   created_at         DateTime?            @default(now()) @db.Timestamptz(6)
   updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
   enrollments        enrollments[]
@@ -386,6 +394,7 @@ model students {
   student_piars      student_piars[]
   schools            schools              @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   transactions       transactions[]
+  grades             grades?              @relation(fields: [aspired_grade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@unique([school_id, document_number])
   @@index([document_number], map: "idx_students_document")

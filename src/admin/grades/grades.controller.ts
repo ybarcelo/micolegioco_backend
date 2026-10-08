@@ -34,7 +34,7 @@ export class GradesController {
   @Roles('RECTOR', 'SECRETARIO')
   async create(
     @CurrentUser() user: JwtPayload,
-    @Body() body: { name: string; level: number; jornada?: string; nivel_educativo?: string },
+    @Body() body: { name: string; level: number; jornada?: string; nivel_educativo?: string; single_section?: boolean },
   ) {
     if (!body.name) throw new BadRequestException('name is required')
     if (body.level === undefined || body.level === null) throw new BadRequestException('level is required')
@@ -55,6 +55,7 @@ export class GradesController {
           level: body.level,
           jornada,
           nivel_educativo,
+          single_section: body.single_section ?? false,
         },
       })
     } catch (error) {
@@ -71,7 +72,7 @@ export class GradesController {
   async update(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
-    @Body() body: { name?: string; level?: number; jornada?: string; nivel_educativo?: string },
+    @Body() body: { name?: string; level?: number; jornada?: string; nivel_educativo?: string; single_section?: boolean },
   ) {
     const grade = await this.prisma.grades.findFirst({
       where: { id, school_id: user.school_id },
@@ -84,6 +85,19 @@ export class GradesController {
     if (body.nivel_educativo !== undefined && !this.VALID_NIVELES.includes(body.nivel_educativo))
       throw new BadRequestException(`nivel_educativo must be one of: ${this.VALID_NIVELES.join(', ')}`)
 
+    if (body.single_section === true && !grade.single_section) {
+      const counts = await this.prisma.sections.groupBy({
+        by: ['academic_year_id'],
+        where: { grade_id: id },
+        _count: { id: true },
+      })
+      if (counts.some(c => c._count.id > 1)) {
+        throw new ConflictException(
+          'No se puede marcar como sección única: este grado ya tiene varias secciones creadas en algún año académico',
+        )
+      }
+    }
+
     try {
       return await this.prisma.grades.update({
         where: { id },
@@ -92,6 +106,7 @@ export class GradesController {
           level:           body.level           ?? grade.level,
           jornada:         body.jornada         ?? grade.jornada,
           nivel_educativo: body.nivel_educativo ?? grade.nivel_educativo,
+          single_section:  body.single_section  ?? grade.single_section,
         },
       })
     } catch (error) {

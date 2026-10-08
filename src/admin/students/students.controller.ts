@@ -34,6 +34,7 @@ export class StudentsController {
     @CurrentUser() user: JwtPayload,
     @Query('q') q?: string,
     @Query('status') status?: string,
+    @Query('exclude_status') excludeStatus?: string,
     @Query('page') page?: string,
     @Query('exclude_year_id') excludeYearId?: string,
   ) {
@@ -43,6 +44,7 @@ export class StudentsController {
     const where: any = { school_id: user.school_id }
 
     if (status) where.status = status
+    else if (excludeStatus) where.status = { not: excludeStatus }
 
     if (q) {
       where.OR = [
@@ -69,6 +71,7 @@ export class StudentsController {
         skip,
         take: PAGE_SIZE,
         orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }],
+        include: { grades: { select: { id: true, name: true } } },
       }),
       this.prisma.students.count({ where }),
     ])
@@ -101,6 +104,7 @@ export class StudentsController {
           sisben_score: body.sisben_score ?? null,
           ethnicity: body.ethnicity ?? 'Ninguna',
           status: body.status ?? 'PROSPECTIVE',
+          aspired_grade_id: body.aspired_grade_id ?? null,
           metadata: body.metadata ?? {},
         },
       })
@@ -260,6 +264,7 @@ export class StudentsController {
           sisben_score: body.sisben_score !== undefined ? body.sisben_score : existing.sisben_score,
           ethnicity: body.ethnicity !== undefined ? body.ethnicity : existing.ethnicity,
           status: body.status !== undefined ? body.status : existing.status,
+          aspired_grade_id: body.aspired_grade_id !== undefined ? body.aspired_grade_id : existing.aspired_grade_id,
           metadata: body.metadata !== undefined ? body.metadata : existing.metadata,
           updated_at: new Date(),
         },

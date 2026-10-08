@@ -23,5 +23,8 @@ npm-debug.log*
 # Prisma generated client
 src/generated/
 
+# Archivos subidos por usuarios (documentos de matrícula, etc.)
+uploads/
+
 # OS
 Thumbs.db

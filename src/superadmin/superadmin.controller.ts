@@ -12,6 +12,7 @@ import {
 import * as bcrypt from 'bcryptjs'
 import { Roles } from '../common/decorators/roles.decorator'
 import { PrismaService } from '../prisma/prisma.service'
+import { slugify } from '../common/utils/slug.util'
 
 const ALLOWED_ROLES = ['RECTOR', 'SECRETARIO', 'DOCENTE']
 
@@ -56,11 +57,20 @@ export class SuperadminController {
     if (!body.name?.trim()) throw new BadRequestException('name is required')
     if (!body.nit?.trim())  throw new BadRequestException('nit is required')
 
+    const base = slugify(body.name) || 'colegio'
+    let slug = base
+    let n = 2
+    while (await this.prisma.schools.findUnique({ where: { slug } })) {
+      slug = `${base}-${n}`
+      n++
+    }
+
     try {
       return await this.prisma.schools.create({
         data: {
           name:              body.name.trim(),
           nit:               body.nit.trim(),
+          slug,
           address:           body.address?.trim()           ?? null,
           city:              body.city?.trim()               ?? 'Barranquilla',
           phone:             body.phone?.trim()              ?? null,

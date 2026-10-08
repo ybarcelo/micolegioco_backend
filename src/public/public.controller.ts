@@ -17,6 +17,13 @@ import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import { catalogLabel } from '../catalog/enrollment-doc.catalog'
 
+function isEnrollmentOpen(school: { enrollment_opens_at: Date | null; enrollment_closes_at: Date | null }): boolean {
+  const today = new Date(new Date().toISOString().slice(0, 10))
+  if (school.enrollment_opens_at && today < school.enrollment_opens_at) return false
+  if (school.enrollment_closes_at && today > school.enrollment_closes_at) return false
+  return true
+}
+
 @Public()
 @Controller('public')
 export class PublicController {
@@ -26,11 +33,11 @@ export class PublicController {
   ) {}
 
   @Get('school')
-  async getSchool(@Query('idschool') idschool: string) {
-    if (!idschool) throw new BadRequestException('idschool is required')
+  async getSchool(@Query('slug') slug: string) {
+    if (!slug) throw new BadRequestException('slug is required')
 
     const school = await this.prisma.schools.findUnique({
-      where: { id: idschool },
+      where: { slug },
       select: {
         id: true,
         name: true,
@@ -38,6 +45,9 @@ export class PublicController {
         phone: true,
         address: true,
         logo: true,
+        privacy_policy_url: true,
+        enrollment_opens_at: true,
+        enrollment_closes_at: true,
       },
     })
 
@@ -46,12 +56,31 @@ export class PublicController {
     return school
   }
 
+  @Get('school/grades')
+  async getGrades(@Query('slug') slug: string) {
+    if (!slug) throw new BadRequestException('slug is required')
+
+    const school = await this.prisma.schools.findUnique({ where: { slug } })
+    if (!school) throw new NotFoundException('School not found')
+
+    const grades = await this.prisma.grades.findMany({
+      where: { school_id: school.id },
+      orderBy: { level: 'asc' },
+      select: { id: true, name: true },
+    })
+
+    return grades
+  }
+
   @Get('school/enrollment-docs')
-  async getEnrollmentDocs(@Query('idschool') idschool: string) {
-    if (!idschool) throw new BadRequestException('idschool is required')
+  async getEnrollmentDocs(@Query('slug') slug: string) {
+    if (!slug) throw new BadRequestException('slug is required')
+
+    const school = await this.prisma.schools.findUnique({ where: { slug } })
+    if (!school) throw new NotFoundException('School not found')
 
     const configs = await this.prisma.enrollment_doc_configs.findMany({
-      where: { school_id: idschool, is_active: true },
+      where: { school_id: school.id, is_active: true },
       orderBy: { sort_order: 'asc' },
     })
 
@@ -64,16 +93,35 @@ export class PublicController {
 
   @Post('pre-registration')
   async preRegister(
-    @Body() body: { idschool: string; student: any; guardian: any },
+    @Body() body: { slug: string; student: any; guardian: any; policy_accepted?: boolean },
   ) {
-    const { idschool, student, guardian } = body
+    const { slug, student, guardian, policy_accepted } = body
 
-    if (!idschool) throw new BadRequestException('idschool is required')
+    if (!slug) throw new BadRequestException('slug is required')
     if (!student) throw new BadRequestException('student data is required')
     if (!guardian) throw new BadRequestException('guardian data is required')
+    if (policy_accepted !== true) {
+      throw new BadRequestException('Debe aceptar la política de tratamiento de datos')
+    }
 
-    const school = await this.prisma.schools.findUnique({ where: { id: idschool } })
+    const school = await this.prisma.schools.findUnique({ where: { slug } })
     if (!school) throw new NotFoundException('School not found')
+
+    if (!isEnrollmentOpen(school)) {
+      throw new BadRequestException('Las inscripciones no están abiertas en este momento')
+    }
+
+    if (!student.aspired_grade_id) {
+      throw new BadRequestException('Debe seleccionar el grado al que aspira')
+    }
+
+    const aspiredGrade = await this.prisma.grades.findUnique({ where: { id: student.aspired_grade_id } })
+    if (!aspiredGrade || aspiredGrade.school_id !== school.id) {
+      throw new BadRequestException('El grado seleccionado no es válido')
+    }
+
+    const idschool = school.id
+    const policyAcceptedAt = new Date()
 
     const result = await this.prisma.$transaction(async tx => {
       // Find or create student
@@ -99,11 +147,18 @@ export class PublicController {
             birth_city: student.birth_city ?? null,
             gender: student.gender ?? null,
             blood_type: student.blood_type ?? null,
-            estrato: student.estrato ?? null,
+            estrato: student.estrato ? Number(student.estrato) : null,
             sisben_score: student.sisben_score ?? null,
             ethnicity: student.ethnicity ?? 'Ninguna',
             status: 'PROSPECTIVE',
+            data_policy_accepted_at: policyAcceptedAt,
+            aspired_grade_id: student.aspired_grade_id,
           },
+        })
+      } else {
+        dbStudent = await tx.students.update({
+          where: { id: dbStudent.id },
+          data: { data_policy_accepted_at: policyAcceptedAt, aspired_grade_id: student.aspired_grade_id },
         })
       }
 
@@ -181,17 +236,19 @@ export class PublicController {
   )
   async uploadEnrollmentDoc(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { student_id: string; doc_config_id: string; idschool: string },
+    @Body() body: { student_id: string; doc_config_id: string; slug: string },
   ) {
     if (!file) throw new BadRequestException('file is required')
 
-    const { student_id, doc_config_id, idschool } = body
-    if (!student_id || !doc_config_id || !idschool) {
-      throw new BadRequestException('student_id, doc_config_id, and idschool are required')
+    const { student_id, doc_config_id, slug } = body
+    if (!student_id || !doc_config_id || !slug) {
+      throw new BadRequestException('student_id, doc_config_id, and slug are required')
     }
 
-    const school = await this.prisma.schools.findUnique({ where: { id: idschool } })
+    const school = await this.prisma.schools.findUnique({ where: { slug } })
     if (!school) throw new NotFoundException('School not found')
+
+    const idschool = school.id
 
     const student = await this.prisma.students.findUnique({ where: { id: student_id } })
     if (!student) throw new NotFoundException('Student not found')
