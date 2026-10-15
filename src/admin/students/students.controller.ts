@@ -71,7 +71,13 @@ export class StudentsController {
         skip,
         take: PAGE_SIZE,
         orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }],
-        include: { grades: { select: { id: true, name: true } } },
+        include: {
+          grades: { select: { id: true, name: true } },
+          enrollments: {
+            where: { status: 'ACTIVE', sections: { academic_years: { is_active: true } } },
+            select: { id: true },
+          },
+        },
       }),
       this.prisma.students.count({ where }),
     ])

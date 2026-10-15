@@ -199,27 +199,40 @@ export class EnrollmentsController {
       throw new BadRequestException('Section is at full capacity')
     }
 
+    const enrollmentStatus = body.status ?? 'ACTIVE'
+
     try {
-      return await this.prisma.enrollments.create({
-        data: {
-          student_id: body.student_id,
-          section_id: body.section_id,
-          enrollment_date: body.enrollment_date ? new Date(body.enrollment_date) : new Date(),
-          status: body.status ?? 'ACTIVE',
-          academic_result: body.academic_result ?? null,
-          student_signature: body.student_signature ?? null,
-          guardian_signature: body.guardian_signature ?? null,
-          rector_signature: body.rector_signature ?? null,
-        },
-        include: {
-          students: true,
-          sections: {
-            include: {
-              grades: true,
-              academic_years: true,
+      return await this.prisma.$transaction(async tx => {
+        const enrollment = await tx.enrollments.create({
+          data: {
+            student_id: body.student_id,
+            section_id: body.section_id,
+            enrollment_date: body.enrollment_date ? new Date(body.enrollment_date) : new Date(),
+            status: enrollmentStatus,
+            academic_result: body.academic_result ?? null,
+            student_signature: body.student_signature ?? null,
+            guardian_signature: body.guardian_signature ?? null,
+            rector_signature: body.rector_signature ?? null,
+          },
+          include: {
+            students: true,
+            sections: {
+              include: {
+                grades: true,
+                academic_years: true,
+              },
             },
           },
-        },
+        })
+
+        if (enrollmentStatus === 'ACTIVE') {
+          await tx.students.update({
+            where: { id: body.student_id },
+            data: { status: 'ACTIVE', updated_at: new Date() },
+          })
+        }
+
+        return enrollment
       })
     } catch (error) {
       const msg = error instanceof Error ? error.message : ''
