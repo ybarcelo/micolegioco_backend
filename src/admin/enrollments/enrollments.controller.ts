@@ -21,6 +21,23 @@ const PAGE_SIZE = 25
 export class EnrollmentsController {
   constructor(private prisma: PrismaService) {}
 
+  /** Consecutivo atómico de matrícula por colegio + año académico (ej. "2026-0001") */
+  private async nextEnrollmentNumber(
+    tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
+    schoolId: string,
+    academicYearId: string,
+    yearLabel: string,
+  ): Promise<string> {
+    const [{ last_number }] = await tx.$queryRaw<{ last_number: number }[]>`
+      INSERT INTO enrollment_sequences (school_id, academic_year_id, last_number)
+      VALUES (${schoolId}::uuid, ${academicYearId}::uuid, 1)
+      ON CONFLICT (school_id, academic_year_id)
+      DO UPDATE SET last_number = enrollment_sequences.last_number + 1
+      RETURNING last_number
+    `
+    return `${yearLabel}-${String(last_number).padStart(4, '0')}`
+  }
+
   @Get()
   @Roles('RECTOR', 'SECRETARIO')
   async findAll(
@@ -97,7 +114,10 @@ export class EnrollmentsController {
 
     const section = await this.prisma.sections.findFirst({
       where: { id: body.section_id, grades: { school_id: user.school_id } },
-      select: { id: true, capacity: true },
+      select: {
+        id: true, capacity: true, academic_year_id: true,
+        academic_years: { select: { label: true } },
+      },
     })
     if (!section) throw new NotFoundException('Section not found')
 
@@ -151,12 +171,17 @@ export class EnrollmentsController {
     if (toCreate.length > 0) {
       await this.prisma.$transaction(async tx => {
         for (const student of toCreate) {
+          const enrollmentNumber = await this.nextEnrollmentNumber(
+            tx, user.school_id!, section.academic_year_id!, section.academic_years!.label,
+          )
+
           await tx.enrollments.create({
             data: {
-              student_id:      student.id,
-              section_id:      body.section_id,
-              enrollment_date: enrollDate,
-              status:          'ACTIVE',
+              student_id:        student.id,
+              section_id:        body.section_id,
+              enrollment_date:   enrollDate,
+              enrollment_number: enrollmentNumber,
+              status:            'ACTIVE',
             },
           })
           await tx.students.update({
@@ -203,11 +228,16 @@ export class EnrollmentsController {
 
     try {
       return await this.prisma.$transaction(async tx => {
+        const enrollmentNumber = await this.nextEnrollmentNumber(
+          tx, user.school_id!, section.academic_year_id!, section.academic_years!.label,
+        )
+
         const enrollment = await tx.enrollments.create({
           data: {
             student_id: body.student_id,
             section_id: body.section_id,
             enrollment_date: body.enrollment_date ? new Date(body.enrollment_date) : new Date(),
+            enrollment_number: enrollmentNumber,
             status: enrollmentStatus,
             academic_result: body.academic_result ?? null,
             student_signature: body.student_signature ?? null,

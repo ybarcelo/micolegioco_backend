@@ -37,6 +37,9 @@ export class StudentsController {
     @Query('exclude_status') excludeStatus?: string,
     @Query('page') page?: string,
     @Query('exclude_year_id') excludeYearId?: string,
+    @Query('academic_year_id') academicYearId?: string,
+    @Query('grade_id') gradeId?: string,
+    @Query('section_id') sectionId?: string,
   ) {
     const pageNum = Math.max(1, parseInt(page ?? '1', 10) || 1)
     const skip = (pageNum - 1) * PAGE_SIZE
@@ -60,6 +63,20 @@ export class StudentsController {
           some: {
             status: 'ACTIVE',
             sections: { academic_year_id: excludeYearId },
+          },
+        },
+      }
+    }
+
+    // Filtra por el curso (grado/sección) de la matrícula activa del estudiante
+    if (academicYearId || gradeId || sectionId) {
+      where.enrollments = {
+        some: {
+          status: 'ACTIVE',
+          ...(sectionId ? { section_id: sectionId } : {}),
+          sections: {
+            ...(academicYearId ? { academic_year_id: academicYearId } : {}),
+            ...(gradeId ? { grade_id: gradeId } : {}),
           },
         },
       }
@@ -239,6 +256,109 @@ export class StudentsController {
 
     if (!student) throw new NotFoundException('Student not found')
     return student
+  }
+
+  /**
+   * Resumen de notas de un estudiante en un año lectivo, para certificados de notas
+   * (finales/periódicas). A diferencia de /admin/academic-record/grades (una sección,
+   * un período), aquí se trae un solo estudiante a través de TODOS los períodos del año.
+   */
+  @Get(':id/grades-summary')
+  @Roles('RECTOR', 'SECRETARIO')
+  async getGradesSummary(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Query('academic_year_id') academicYearId: string,
+  ) {
+    if (!academicYearId) throw new BadRequestException('academic_year_id is required')
+
+    const student = await this.prisma.students.findFirst({ where: { id, school_id: user.school_id } })
+    if (!student) throw new NotFoundException('Student not found')
+
+    const enrollment = await this.prisma.enrollments.findFirst({
+      where: {
+        student_id: id,
+        sections: { academic_year_id: academicYearId, grades: { school_id: user.school_id } },
+      },
+      select: { id: true, sections: { select: { grade_id: true } } },
+      orderBy: { enrollment_date: 'desc' },
+    })
+    if (!enrollment || !enrollment.sections?.grade_id)
+      throw new NotFoundException('El estudiante no tiene matrícula en ese año lectivo')
+
+    const gradeId = enrollment.sections.grade_id
+
+    const [config, periods, gradeSubjects] = await Promise.all([
+      this.prisma.grading_scale_config.findUnique({ where: { school_id: user.school_id } }),
+      this.prisma.academic_periods.findMany({
+        where: { academic_year_id: academicYearId, school_id: user.school_id },
+        orderBy: { sort_order: 'asc' },
+        select: { id: true, name: true, period_number: true },
+      }),
+      this.prisma.grade_subjects.findMany({
+        where: { school_id: user.school_id, grade_id: gradeId, academic_year_id: academicYearId },
+        select: {
+          subject_id: true,
+          subjects: {
+            select: { id: true, name: true, sort_order: true, subject_areas: { select: { id: true, name: true, sort_order: true } } },
+          },
+        },
+        orderBy: [
+          { subjects: { subject_areas: { sort_order: 'asc' } } },
+          { subjects: { sort_order: 'asc' } },
+        ],
+      }),
+    ])
+
+    const scaleType  = config?.scale_type ?? 'NUMERIC'
+    const periodIds  = periods.map(p => p.id)
+    const periodsOut = periods.map(p => ({ id: p.id, name: p.name, period_number: p.period_number }))
+
+    if (scaleType === 'POINTS') {
+      const areaMap = new Map<string, { id: string; name: string; sort_order: number }>()
+      for (const gs of gradeSubjects) {
+        const a = gs.subjects.subject_areas
+        if (a?.id && !areaMap.has(a.id)) areaMap.set(a.id, { id: a.id, name: a.name, sort_order: a.sort_order ?? 0 })
+      }
+      const areas = [...areaMap.values()].sort((a, b) => a.sort_order - b.sort_order)
+
+      const areaGrades = await this.prisma.student_area_grades.findMany({
+        where: { school_id: user.school_id, enrollment_id: enrollment.id, academic_period_id: { in: periodIds } },
+        select: { subject_area_id: true, academic_period_id: true, points: true },
+      })
+
+      return {
+        scale_type: 'POINTS',
+        periods: periodsOut,
+        subjects: [],
+        areas,
+        grades: [],
+        area_grades: areaGrades.map(g => ({
+          subject_area_id: g.subject_area_id, academic_period_id: g.academic_period_id, points: g.points,
+        })),
+      }
+    }
+
+    const grades = await this.prisma.student_grades.findMany({
+      where: { school_id: user.school_id, enrollment_id: enrollment.id, academic_period_id: { in: periodIds } },
+      select: { subject_id: true, academic_period_id: true, numeric_grade: true, qualitative_grade: true },
+    })
+
+    return {
+      scale_type: scaleType,
+      periods: periodsOut,
+      subjects: gradeSubjects.map(gs => ({
+        id: gs.subjects.id, name: gs.subjects.name, sort_order: gs.subjects.sort_order,
+      })),
+      areas: [],
+      grades: grades.map(g => ({
+        subject_id:         g.subject_id,
+        academic_period_id: g.academic_period_id,
+        numeric_grade:      g.numeric_grade ? Number(g.numeric_grade) : null,
+        qualitative_grade:  g.qualitative_grade ?? null,
+      })),
+      area_grades: [],
+    }
   }
 
   @Put(':id')

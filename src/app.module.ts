@@ -32,6 +32,7 @@ import { SuperadminModule } from './superadmin/superadmin.module'
 import { DashboardModule } from './admin/dashboard/dashboard.module'
 import { DiagnosticsModule } from './admin/diagnostics/diagnostics.module'
 import { PreschoolRecordModule } from './admin/preschool-record/preschool-record.module'
+import { MeetingsModule } from './admin/meetings/meetings.module'
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { PreschoolRecordModule } from './admin/preschool-record/preschool-record
     DashboardModule,
     DiagnosticsModule,
     PreschoolRecordModule,
+    MeetingsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

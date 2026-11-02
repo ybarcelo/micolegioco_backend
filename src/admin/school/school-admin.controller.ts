@@ -38,6 +38,8 @@ export class SchoolAdminController {
         sector: true,
         rector_name: true,
         rector_signature: true,
+        secretary_name: true,
+        secretary_signature: true,
         resolution_number: true,
         calendar: true,
         slug: true,
@@ -55,7 +57,7 @@ export class SchoolAdminController {
   @Roles('RECTOR')
   async updateSchool(
     @CurrentUser() user: JwtPayload,
-    @Body() body: { name?: string; address?: string; city?: string; phone?: string; logo?: string; rector_name?: string; rector_signature?: string; resolution_number?: string; calendar?: string; slug?: string; privacy_policy_url?: string; enrollment_opens_at?: string; enrollment_closes_at?: string },
+    @Body() body: { name?: string; address?: string; city?: string; phone?: string; logo?: string; rector_name?: string; rector_signature?: string; secretary_name?: string; secretary_signature?: string; resolution_number?: string; calendar?: string; slug?: string; privacy_policy_url?: string; enrollment_opens_at?: string; enrollment_closes_at?: string },
   ) {
     const school = await this.prisma.schools.findUnique({ where: { id: user.school_id } })
     if (!school) throw new NotFoundException('School not found')
@@ -115,6 +117,8 @@ export class SchoolAdminController {
           logo:             body.logo             !== undefined ? body.logo             : school.logo,
           rector_name:       body.rector_name       !== undefined ? body.rector_name       : school.rector_name,
           rector_signature:  body.rector_signature  !== undefined ? body.rector_signature  : school.rector_signature,
+          secretary_name:      body.secretary_name      !== undefined ? body.secretary_name      : school.secretary_name,
+          secretary_signature: body.secretary_signature !== undefined ? body.secretary_signature : school.secretary_signature,
           resolution_number: body.resolution_number !== undefined ? body.resolution_number : school.resolution_number,
           calendar:          body.calendar          !== undefined ? (body.calendar || null) : school.calendar,
           slug:              body.slug             !== undefined ? body.slug             : school.slug,
@@ -133,6 +137,8 @@ export class SchoolAdminController {
           logo: true,
           rector_name: true,
           rector_signature: true,
+          secretary_name: true,
+          secretary_signature: true,
           resolution_number: true,
           calendar: true,
           slug: true,

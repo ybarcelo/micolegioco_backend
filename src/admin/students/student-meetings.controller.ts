@@ -30,6 +30,7 @@ export class StudentMeetingsController {
       include: {
         guardians: true,
         users: { select: { full_name: true } },
+        student_follow_up_records: { select: { id: true } },
       },
       orderBy: { scheduled_datetime: 'desc' },
     })
@@ -61,16 +62,12 @@ export class StudentMeetingsController {
         meeting_reason: body.meeting_reason,
         scheduled_datetime: new Date(body.scheduled_datetime),
         status: body.status ?? 'SCHEDULED',
-        meeting_notes: body.meeting_notes ?? null,
-        agreements: body.agreements ?? null,
-        guardian_signature: body.guardian_signature ?? null,
-        student_signature: body.student_signature ?? null,
-        staff_signature: body.staff_signature ?? null,
         location: body.location ?? 'Coordinación',
       },
       include: {
         guardians: true,
         users: { select: { full_name: true } },
+        student_follow_up_records: { select: { id: true } },
       },
     })
 
@@ -99,11 +96,6 @@ export class StudentMeetingsController {
       where: { id: mId },
       data: {
         status: body.status !== undefined ? body.status : meeting.status,
-        meeting_notes: body.meeting_notes !== undefined ? body.meeting_notes : meeting.meeting_notes,
-        agreements: body.agreements !== undefined ? body.agreements : meeting.agreements,
-        guardian_signature: body.guardian_signature !== undefined ? body.guardian_signature : meeting.guardian_signature,
-        student_signature: body.student_signature !== undefined ? body.student_signature : meeting.student_signature,
-        staff_signature: body.staff_signature !== undefined ? body.staff_signature : meeting.staff_signature,
         location: body.location !== undefined ? body.location : meeting.location,
         guardian_id: body.guardian_id !== undefined ? body.guardian_id : meeting.guardian_id,
         scheduled_datetime: body.scheduled_datetime ? new Date(body.scheduled_datetime) : meeting.scheduled_datetime,
@@ -113,6 +105,7 @@ export class StudentMeetingsController {
       include: {
         guardians: true,
         users: { select: { full_name: true } },
+        student_follow_up_records: { select: { id: true } },
       },
     })
 
