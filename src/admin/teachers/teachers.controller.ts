@@ -17,9 +17,11 @@ export class TeachersController {
     const where: any = { school_id: user.school_id }
     if (q) {
       where.OR = [
-        { first_name:      { contains: q, mode: 'insensitive' } },
-        { last_name:       { contains: q, mode: 'insensitive' } },
-        { document_number: { contains: q, mode: 'insensitive' } },
+        { first_name:        { contains: q, mode: 'insensitive' } },
+        { second_name:       { contains: q, mode: 'insensitive' } },
+        { last_name:         { contains: q, mode: 'insensitive' } },
+        { second_last_name:  { contains: q, mode: 'insensitive' } },
+        { document_number:   { contains: q, mode: 'insensitive' } },
       ]
     }
     return this.prisma.teachers.findMany({
@@ -28,7 +30,7 @@ export class TeachersController {
         escalafon_types: true,
         users: { select: { id: true, email: true } },
       },
-      orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }],
+      orderBy: [{ last_name: 'asc' }, { second_last_name: 'asc' }, { first_name: 'asc' }, { second_name: 'asc' }],
     })
   }
 
@@ -48,8 +50,8 @@ export class TeachersController {
   async create(
     @CurrentUser() user: JwtPayload,
     @Body() body: {
-      first_name: string; last_name: string
-      document_type: string; document_number: string
+      first_name: string; second_name?: string; last_name: string; second_last_name?: string
+      document_type: string; document_number: string; exp_city?: string
       address?: string; phone_mobile?: string
       escalafon_type_id?: string; profession?: string
     },
@@ -64,9 +66,12 @@ export class TeachersController {
         data: {
           school_id:         user.school_id,
           first_name:        body.first_name.trim(),
+          second_name:       body.second_name?.trim()      || null,
           last_name:         body.last_name.trim(),
+          second_last_name:  body.second_last_name?.trim() || null,
           document_type:     body.document_type,
           document_number:   body.document_number.trim(),
+          exp_city:          body.exp_city                ?? null,
           address:           body.address           ?? null,
           phone_mobile:      body.phone_mobile       ?? null,
           escalafon_type_id: body.escalafon_type_id ?? null,
@@ -97,9 +102,12 @@ export class TeachersController {
         where: { id },
         data: {
           first_name:        body.first_name        ?? teacher.first_name,
+          second_name:       body.second_name       !== undefined ? body.second_name      : teacher.second_name,
           last_name:         body.last_name         ?? teacher.last_name,
+          second_last_name:  body.second_last_name  !== undefined ? body.second_last_name : teacher.second_last_name,
           document_type:     body.document_type     ?? teacher.document_type,
           document_number:   body.document_number   ?? teacher.document_number,
+          exp_city:          body.exp_city          !== undefined ? body.exp_city        : teacher.exp_city,
           address:           body.address           !== undefined ? body.address        : teacher.address,
           phone_mobile:      body.phone_mobile      !== undefined ? body.phone_mobile   : teacher.phone_mobile,
           escalafon_type_id: body.escalafon_type_id !== undefined ? body.escalafon_type_id : teacher.escalafon_type_id,
@@ -152,7 +160,7 @@ export class TeachersController {
         newUser = await tx.users.create({
           data: {
             school_id:     user.school_id,
-            full_name:     `${teacher.first_name} ${teacher.last_name}`,
+            full_name:     [teacher.first_name, teacher.second_name, teacher.last_name, teacher.second_last_name].filter(Boolean).join(' '),
             email:         body.email.trim().toLowerCase(),
             password_hash: hash,
             role_id:       docenteRole.id,
@@ -234,12 +242,15 @@ export class TeachersController {
     if (!teacher) throw new NotFoundException('Docente no encontrado')
 
     return {
-      id:              teacher.id,
-      first_name:      teacher.first_name,
-      last_name:       teacher.last_name,
-      document_type:   teacher.document_type,
-      document_number: teacher.document_number,
-      address:         teacher.address,
+      id:               teacher.id,
+      first_name:       teacher.first_name,
+      second_name:      teacher.second_name,
+      last_name:        teacher.last_name,
+      second_last_name: teacher.second_last_name,
+      document_type:    teacher.document_type,
+      document_number:  teacher.document_number,
+      exp_city:         teacher.exp_city,
+      address:          teacher.address,
       phone_mobile:    teacher.phone_mobile,
       profession:      teacher.profession,
       escalafon:       teacher.escalafon_types?.name ?? null,

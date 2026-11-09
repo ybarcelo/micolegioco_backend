@@ -94,6 +94,7 @@ model enrollments {
   student_convivencia_grades   student_convivencia_grades[]
   attendances                  attendances[]
   pre_informes                 pre_informes[]
+  certificates                 certificates[]
 
   @@unique([student_id, section_id])
 }
@@ -107,6 +108,26 @@ model enrollment_sequences {
   academic_years   academic_years @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
 
   @@unique([school_id, academic_year_id])
+}
+
+model certificates {
+  id                  String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id           String        @db.Uuid
+  student_id          String?       @db.Uuid
+  enrollment_id       String?       @db.Uuid
+  service_fee_id      String?       @db.Uuid
+  certificate_code    String        @unique @db.VarChar(30)
+  certificate_subtype String?       @db.VarChar(30)
+  student_status      String?       @db.VarChar(30)
+  issued_by           String?       @db.Uuid
+  issued_at           DateTime?     @default(now()) @db.Timestamptz(6)
+  schools             schools       @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  students            students?     @relation(fields: [student_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  enrollments         enrollments?  @relation(fields: [enrollment_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  service_fees        service_fees? @relation(fields: [service_fee_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  users               users?        @relation(fields: [issued_by], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([school_id], map: "idx_certificates_school")
 }
 
 model fee_definitions {
@@ -247,6 +268,7 @@ model schools {
   address                String?
   city                   String?                  @default("Barranquilla") @db.VarChar(100)
   phone                  String?                  @db.VarChar(20)
+  email                  String?                  @db.VarChar(150)
   dane_code              String?                  @unique @db.VarChar(20)
   calendar               String?                  @db.Char(1)
   sector                 String?                  @default("PRIVADO") @db.VarChar(20)
@@ -300,6 +322,7 @@ model schools {
   student_follow_up_records    student_follow_up_records[]
   pre_informes                 pre_informes[]
   enrollment_sequences         enrollment_sequences[]
+  certificates                 certificates[]
 }
 
 model service_fees {
@@ -317,6 +340,7 @@ model service_fees {
   created_at             DateTime?        @default(now()) @db.Timestamptz(6)
   schools                schools          @relation(fields: [school_id], references: [id], onDelete: Cascade)
   student_ledger         student_ledger[]
+  certificates           certificates[]
 
   @@unique([school_id, name])
 }
@@ -422,7 +446,9 @@ model students {
   id                 String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   school_id          String               @db.Uuid
   first_name         String               @db.VarChar(100)
+  second_name        String?              @db.VarChar(100)
   last_name          String               @db.VarChar(100)
+  second_last_name   String?              @db.VarChar(100)
   document_type      String               @db.VarChar(10)
   document_number    String               @db.VarChar(50)
   exp_city           String?              @db.VarChar(100)
@@ -452,6 +478,7 @@ model students {
   transactions       transactions[]
   grades             grades?              @relation(fields: [aspired_grade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   student_follow_up_records student_follow_up_records[]
+  certificates       certificates[]
 
   @@unique([school_id, document_number])
   @@index([document_number], map: "idx_students_document")
@@ -491,6 +518,7 @@ model users {
   roles           roles?            @relation(fields: [role_id], references: [id], onUpdate: NoAction)
   schools         schools?          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   attendances     attendances[]
+  certificates    certificates[]
 }
 
 // ── Módulo de Docentes ───────────────────────────────────
@@ -514,9 +542,12 @@ model teachers {
   school_id                 String                    @db.Uuid
   user_id                   String?                   @unique @db.Uuid
   first_name                String                    @db.VarChar(100)
+  second_name               String?                   @db.VarChar(100)
   last_name                 String                    @db.VarChar(100)
+  second_last_name          String?                   @db.VarChar(100)
   document_type             String                    @db.VarChar(10)
   document_number           String                    @db.VarChar(50)
+  exp_city                  String?                   @db.VarChar(100)
   address                   String?
   phone_mobile              String?                   @db.VarChar(20)
   escalafon_type_id         String?                   @db.Uuid

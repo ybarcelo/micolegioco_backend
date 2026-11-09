@@ -8,11 +8,12 @@ SELECT
     s.dane_code AS codigo_dane_colegio,
     st.document_type,
     st.document_number,
-    st.last_name || ' ' || st.first_name AS nombre_completo,
+    st.last_name || COALESCE(' ' || st.second_last_name, '') || ' ' || st.first_name || COALESCE(' ' || st.second_name, '') AS nombre_completo,
     st.birth_date,
     st.gender,
     g.name AS grado_actual,
-    sec.name AS grupo
+    sec.name AS grupo,
+    st.exp_city AS municipio_expedicion
 FROM students st
 JOIN schools s ON st.school_id = s.id
 JOIN enrollments e ON st.id = e.student_id

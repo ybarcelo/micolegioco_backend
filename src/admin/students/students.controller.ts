@@ -52,7 +52,9 @@ export class StudentsController {
     if (q) {
       where.OR = [
         { first_name: { contains: q, mode: 'insensitive' } },
+        { second_name: { contains: q, mode: 'insensitive' } },
         { last_name: { contains: q, mode: 'insensitive' } },
+        { second_last_name: { contains: q, mode: 'insensitive' } },
         { document_number: { contains: q, mode: 'insensitive' } },
       ]
     }
@@ -87,7 +89,7 @@ export class StudentsController {
         where,
         skip,
         take: PAGE_SIZE,
-        orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }],
+        orderBy: [{ last_name: 'asc' }, { second_last_name: 'asc' }, { first_name: 'asc' }, { second_name: 'asc' }],
         include: {
           grades: { select: { id: true, name: true } },
           enrollments: {
@@ -115,7 +117,9 @@ export class StudentsController {
         data: {
           school_id: user.school_id,
           first_name: body.first_name,
+          second_name: body.second_name ?? null,
           last_name: body.last_name,
+          second_last_name: body.second_last_name ?? null,
           document_type: body.document_type,
           document_number: body.document_number,
           exp_city: body.exp_city ?? null,
@@ -146,11 +150,11 @@ export class StudentsController {
   downloadTemplate(@Res() res: Response) {
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Nombres', 'Apellidos', 'Tipo de documento', 'Número de documento'],
-      ['María', 'González Pérez', 'TI', '1234567890'],
-      ['Juan', 'Martínez López', 'RC', '9876543210'],
+      ['Nombres', 'Segundo Nombre', 'Apellidos', 'Segundo Apellido', 'Tipo de documento', 'Número de documento'],
+      ['María', '', 'González Pérez', '', 'TI', '1234567890'],
+      ['Juan', 'Camilo', 'Martínez', 'López', 'RC', '9876543210'],
     ])
-    ws['!cols'] = [{ wch: 22 }, { wch: 26 }, { wch: 22 }, { wch: 22 }]
+    ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 22 }]
     XLSX.utils.book_append_sheet(wb, ws, 'Estudiantes')
     const buf: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -182,16 +186,18 @@ export class StudentsController {
 
     const VALID_DOC_TYPES = new Set(['TI', 'RC', 'CC', 'CE', 'PA'])
     const errors: { row: number; message: string }[] = []
-    const toCreate: { row: number; first_name: string; last_name: string; document_type: string; document_number: string }[] = []
+    const toCreate: { row: number; first_name: string; second_name: string; last_name: string; second_last_name: string; document_type: string; document_number: string }[] = []
     const seenDocs = new Set<string>()
 
     for (let i = 0; i < dataRows.length; i++) {
       const row        = dataRows[i]
       const rowNum     = i + 2
       const firstName  = row[0]?.toString().trim() ?? ''
-      const lastName   = row[1]?.toString().trim() ?? ''
-      const docType    = row[2]?.toString().trim().toUpperCase() ?? ''
-      const docNumber  = row[3]?.toString().trim() ?? ''
+      const secondName = row[1]?.toString().trim() ?? ''
+      const lastName   = row[2]?.toString().trim() ?? ''
+      const secondLastName = row[3]?.toString().trim() ?? ''
+      const docType    = row[4]?.toString().trim().toUpperCase() ?? ''
+      const docNumber  = row[5]?.toString().trim() ?? ''
 
       if (!firstName && !lastName && !docType && !docNumber) continue
       if (!firstName)  { errors.push({ row: rowNum, message: 'Nombres vacío' }); continue }
@@ -210,7 +216,7 @@ export class StudentsController {
       }
       seenDocs.add(docKey)
 
-      toCreate.push({ row: rowNum, first_name: firstName, last_name: lastName, document_type: docType, document_number: docNumber })
+      toCreate.push({ row: rowNum, first_name: firstName, second_name: secondName, last_name: lastName, second_last_name: secondLastName, document_type: docType, document_number: docNumber })
     }
 
     if (toCreate.length > 0) {
@@ -231,13 +237,15 @@ export class StudentsController {
       if (valid.length > 0) {
         await this.prisma.students.createMany({
           data: valid.map(t => ({
-            school_id:       user.school_id,
-            first_name:      t.first_name,
-            last_name:       t.last_name,
-            document_type:   t.document_type,
-            document_number: t.document_number,
-            ethnicity:       'Ninguna',
-            status:          importStatus,
+            school_id:        user.school_id,
+            first_name:       t.first_name,
+            second_name:      t.second_name || null,
+            last_name:        t.last_name,
+            second_last_name: t.second_last_name || null,
+            document_type:    t.document_type,
+            document_number:  t.document_number,
+            ethnicity:        'Ninguna',
+            status:           importStatus,
           })),
         })
         return { created: valid.length, errors }
@@ -378,7 +386,9 @@ export class StudentsController {
         where: { id },
         data: {
           first_name: body.first_name ?? existing.first_name,
+          second_name: body.second_name !== undefined ? body.second_name : existing.second_name,
           last_name: body.last_name ?? existing.last_name,
+          second_last_name: body.second_last_name !== undefined ? body.second_last_name : existing.second_last_name,
           document_type: body.document_type ?? existing.document_type,
           document_number: body.document_number ?? existing.document_number,
           exp_city: body.exp_city !== undefined ? body.exp_city : existing.exp_city,

@@ -18,6 +18,7 @@ import { SectionsModule } from './admin/sections/sections.module'
 import { AcademicYearsModule } from './admin/academic-years/academic-years.module'
 import { BenefitTypesModule } from './admin/benefit-types/benefit-types.module'
 import { EnrollmentsModule } from './admin/enrollments/enrollments.module'
+import { CertificatesModule } from './admin/certificates/certificates.module'
 import { FeeDefinitionsModule } from './admin/fee-definitions/fee-definitions.module'
 import { ServiceFeesModule } from './admin/service-fees/service-fees.module'
 import { ExpensesModule } from './admin/expenses/expenses.module'
@@ -65,6 +66,7 @@ import { MeetingsModule } from './admin/meetings/meetings.module'
     AcademicYearsModule,
     BenefitTypesModule,
     EnrollmentsModule,
+    CertificatesModule,
     FeeDefinitionsModule,
     ServiceFeesModule,
     ExpensesModule,

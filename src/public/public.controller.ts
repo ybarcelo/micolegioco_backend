@@ -139,7 +139,9 @@ export class PublicController {
           data: {
             school_id: idschool,
             first_name: student.first_name,
+            second_name: student.second_name ?? null,
             last_name: student.last_name,
+            second_last_name: student.second_last_name ?? null,
             document_type: student.document_type,
             document_number: student.document_number,
             exp_city: student.exp_city ?? null,

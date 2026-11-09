@@ -225,7 +225,7 @@ export class CurriculumController {
         subjects: {
           include: { subject_areas: { select: { id: true, name: true } } },
         },
-        teachers: { select: { id: true, first_name: true, last_name: true } },
+        teachers: { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true } },
       },
       orderBy: { created_at: 'asc' },
     })

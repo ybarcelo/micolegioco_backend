@@ -10,6 +10,7 @@ import {
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { proseName } from '../../common/utils/name.util'
 
 @Controller('admin/academic-record')
 export class AcademicRecordController {
@@ -146,9 +147,9 @@ export class AcademicRecordController {
     if (section.director_id) {
       const teacher = await this.prisma.teachers.findFirst({
         where:  { id: section.director_id },
-        select: { first_name: true, last_name: true },
+        select: { first_name: true, second_name: true, last_name: true, second_last_name: true },
       })
-      if (teacher) directorName = `${teacher.first_name} ${teacher.last_name}`
+      if (teacher) directorName = proseName(teacher)
     }
 
     let achievements: { subject_id: string; description: string; code: string }[] = []
@@ -232,9 +233,9 @@ export class AcademicRecordController {
           },
           select: {
             id: true,
-            students: { select: { id: true, first_name: true, last_name: true } },
+            students: { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true } },
           },
-          orderBy: { students: { last_name: 'asc' } },
+          orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
         }),
         this.prisma.grade_subjects.findMany({
           where: {
@@ -365,9 +366,11 @@ export class AcademicRecordController {
         weight_percentage: period.weight_percentage ? Number(period.weight_percentage) : null,
       } : null,
       students: enrollments.map(e => ({
-        enrollment_id: e.id,
-        first_name:    e.students?.first_name ?? '',
-        last_name:     e.students?.last_name  ?? '',
+        enrollment_id:    e.id,
+        first_name:       e.students?.first_name ?? '',
+        second_name:      e.students?.second_name ?? null,
+        last_name:        e.students?.last_name  ?? '',
+        second_last_name: e.students?.second_last_name ?? null,
       })),
       subjects: gradeSubjects.map(gs => ({
         id:         gs.subjects.id,

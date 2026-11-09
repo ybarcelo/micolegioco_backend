@@ -33,6 +33,7 @@ export class SchoolAdminController {
         address: true,
         city: true,
         phone: true,
+        email: true,
         dane_code: true,
         logo: true,
         sector: true,
@@ -57,7 +58,7 @@ export class SchoolAdminController {
   @Roles('RECTOR')
   async updateSchool(
     @CurrentUser() user: JwtPayload,
-    @Body() body: { name?: string; address?: string; city?: string; phone?: string; logo?: string; rector_name?: string; rector_signature?: string; secretary_name?: string; secretary_signature?: string; resolution_number?: string; calendar?: string; slug?: string; privacy_policy_url?: string; enrollment_opens_at?: string; enrollment_closes_at?: string },
+    @Body() body: { name?: string; address?: string; city?: string; phone?: string; email?: string; dane_code?: string; logo?: string; rector_name?: string; rector_signature?: string; secretary_name?: string; secretary_signature?: string; resolution_number?: string; calendar?: string; slug?: string; privacy_policy_url?: string; enrollment_opens_at?: string; enrollment_closes_at?: string },
   ) {
     const school = await this.prisma.schools.findUnique({ where: { id: user.school_id } })
     if (!school) throw new NotFoundException('School not found')
@@ -68,6 +69,20 @@ export class SchoolAdminController {
         throw new BadRequestException('El enlace debe tener solo minúsculas, números y guiones, mínimo 3 caracteres')
       }
       body.slug = slug
+    }
+
+    let email: string | null | undefined = undefined
+    if (body.email !== undefined) {
+      const trimmed = (body.email ?? '').trim()
+      if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        throw new BadRequestException('El correo electrónico no es válido')
+      }
+      email = trimmed || null
+    }
+
+    let daneCode: string | null | undefined = undefined
+    if (body.dane_code !== undefined) {
+      daneCode = body.dane_code.trim() || null
     }
 
     let privacyPolicyUrl: string | null | undefined = undefined
@@ -114,6 +129,8 @@ export class SchoolAdminController {
           address:          body.address          !== undefined ? body.address          : school.address,
           city:             body.city             !== undefined ? body.city             : school.city,
           phone:            body.phone            !== undefined ? body.phone            : school.phone,
+          email:            email                 !== undefined ? email                 : school.email,
+          dane_code:        daneCode              !== undefined ? daneCode              : school.dane_code,
           logo:             body.logo             !== undefined ? body.logo             : school.logo,
           rector_name:       body.rector_name       !== undefined ? body.rector_name       : school.rector_name,
           rector_signature:  body.rector_signature  !== undefined ? body.rector_signature  : school.rector_signature,
@@ -133,6 +150,7 @@ export class SchoolAdminController {
           address: true,
           city: true,
           phone: true,
+          email: true,
           dane_code: true,
           logo: true,
           rector_name: true,
@@ -152,6 +170,9 @@ export class SchoolAdminController {
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
       if (msg.toLowerCase().includes('unique')) {
+        if (msg.toLowerCase().includes('dane_code')) {
+          throw new ConflictException('Ese código DANE ya está en uso por otro colegio')
+        }
         throw new ConflictException('Ese enlace ya está en uso por otro colegio')
       }
       throw e

@@ -34,12 +34,15 @@ export class TeacherController {
     if (!teacher) throw new NotFoundException('Perfil de docente no encontrado')
 
     return {
-      id:              teacher.id,
-      first_name:      teacher.first_name,
-      last_name:       teacher.last_name,
-      document_type:   teacher.document_type,
-      document_number: teacher.document_number,
-      address:         teacher.address,
+      id:               teacher.id,
+      first_name:       teacher.first_name,
+      second_name:      teacher.second_name,
+      last_name:        teacher.last_name,
+      second_last_name: teacher.second_last_name,
+      document_type:    teacher.document_type,
+      document_number:  teacher.document_number,
+      exp_city:         teacher.exp_city,
+      address:          teacher.address,
       phone_mobile:    teacher.phone_mobile,
       profession:      teacher.profession,
       escalafon:       teacher.escalafon_types?.name ?? null,
@@ -146,19 +149,21 @@ export class TeacherController {
       include: {
         students: {
           select: {
-            id: true, first_name: true, last_name: true,
+            id: true, first_name: true, second_name: true, last_name: true, second_last_name: true,
             document_type: true, document_number: true,
           },
         },
       },
-      orderBy: { students: { last_name: 'asc' } },
+      orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
     })
 
     return enrollments.map(e => ({
-      enrollment_id:   e.id,
-      first_name:      e.students?.first_name  ?? '',
-      last_name:       e.students?.last_name   ?? '',
-      document_type:   e.students?.document_type ?? '',
+      enrollment_id:    e.id,
+      first_name:       e.students?.first_name  ?? '',
+      second_name:      e.students?.second_name ?? null,
+      last_name:        e.students?.last_name   ?? '',
+      second_last_name: e.students?.second_last_name ?? null,
+      document_type:    e.students?.document_type ?? '',
       document_number: e.students?.document_number ?? '',
     }))
   }
@@ -257,9 +262,9 @@ export class TeacherController {
           where: { section_id: sectionId, status: 'ACTIVE' },
           select: {
             id:      true,
-            students: { select: { id: true, first_name: true, last_name: true } },
+            students: { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true } },
           },
-          orderBy: { students: { last_name: 'asc' } },
+          orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
         }),
         this.prisma.grade_subjects.findMany({
           where: {
@@ -355,9 +360,11 @@ export class TeacherController {
           weight_percentage: period.weight_percentage ? Number(period.weight_percentage) : null,
         } : null,
         students: enrollments.map(e => ({
-          enrollment_id: e.id,
-          first_name:    e.students?.first_name ?? '',
-          last_name:     e.students?.last_name  ?? '',
+          enrollment_id:    e.id,
+          first_name:       e.students?.first_name ?? '',
+          second_name:      e.students?.second_name ?? null,
+          last_name:        e.students?.last_name  ?? '',
+          second_last_name: e.students?.second_last_name ?? null,
         })),
         areas,
         area_grade_items: existingItems,
@@ -380,9 +387,11 @@ export class TeacherController {
         weight_percentage: period.weight_percentage ? Number(period.weight_percentage) : null,
       } : null,
       students: enrollments.map(e => ({
-        enrollment_id: e.id,
-        first_name:    e.students?.first_name ?? '',
-        last_name:     e.students?.last_name  ?? '',
+        enrollment_id:    e.id,
+        first_name:       e.students?.first_name ?? '',
+        second_name:      e.students?.second_name ?? null,
+        last_name:        e.students?.last_name  ?? '',
+        second_last_name: e.students?.second_last_name ?? null,
       })),
       subjects: gradeSubjects.map(gs => ({
         id:         gs.subjects.id,
@@ -721,8 +730,8 @@ export class TeacherController {
     const [enrollments, existing] = await Promise.all([
       this.prisma.enrollments.findMany({
         where:   { section_id: sectionId, status: 'ACTIVE' },
-        select:  { id: true, students: { select: { first_name: true, last_name: true } } },
-        orderBy: { students: { last_name: 'asc' } },
+        select:  { id: true, students: { select: { first_name: true, second_name: true, last_name: true, second_last_name: true } } },
+        orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
       }),
       this.prisma.attendances.findMany({
         where:  { grade_subject_id: gradeSubjectId, date: dateObj, enrollments: { section_id: sectionId } },
@@ -733,10 +742,12 @@ export class TeacherController {
     const presentMap = new Map(existing.map(e => [e.enrollment_id, e.present]))
 
     return enrollments.map(e => ({
-      enrollment_id: e.id,
-      first_name:    e.students?.first_name ?? '',
-      last_name:     e.students?.last_name  ?? '',
-      present:       presentMap.has(e.id) ? presentMap.get(e.id) : null,
+      enrollment_id:    e.id,
+      first_name:       e.students?.first_name ?? '',
+      second_name:      e.students?.second_name ?? null,
+      last_name:        e.students?.last_name  ?? '',
+      second_last_name: e.students?.second_last_name ?? null,
+      present:          presentMap.has(e.id) ? presentMap.get(e.id) : null,
     }))
   }
 
@@ -884,8 +895,8 @@ export class TeacherController {
     const [enrollments, records, absences] = await Promise.all([
       this.prisma.enrollments.findMany({
         where:   { section_id: sectionId, status: 'ACTIVE' },
-        select:  { id: true, students: { select: { first_name: true, last_name: true } } },
-        orderBy: { students: { last_name: 'asc' } },
+        select:  { id: true, students: { select: { first_name: true, second_name: true, last_name: true, second_last_name: true } } },
+        orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
       }),
       this.prisma.attendances.findMany({
         where:  { grade_subject_id: { in: gsIds }, academic_period_id: periodId },
@@ -904,7 +915,9 @@ export class TeacherController {
       return {
         enrollment_id:         e.id,
         first_name:            e.students?.first_name ?? '',
+        second_name:           e.students?.second_name ?? null,
         last_name:             e.students?.last_name  ?? '',
+        second_last_name:      e.students?.second_last_name ?? null,
         total_classes:         studentRecords.length,
         total_absent_records:  studentRecords.filter(r => !r.present).length,
         period_absence_days:   absenceMap.get(e.id) ?? 0,
@@ -997,9 +1010,9 @@ export class TeacherController {
         where: { section_id: sectionId, status: 'ACTIVE' },
         select: {
           id: true,
-          students: { select: { id: true, first_name: true, last_name: true } },
+          students: { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true } },
         },
-        orderBy: { students: { last_name: 'asc' } },
+        orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
       }),
       this.prisma.grade_subjects.findMany({
         where: {
@@ -1033,9 +1046,11 @@ export class TeacherController {
     return {
       period: period ? { id: period.id, name: period.name, period_number: period.period_number } : null,
       students: enrollments.map(e => ({
-        enrollment_id: e.id,
-        first_name:    e.students?.first_name ?? '',
-        last_name:     e.students?.last_name  ?? '',
+        enrollment_id:    e.id,
+        first_name:       e.students?.first_name ?? '',
+        second_name:      e.students?.second_name ?? null,
+        last_name:        e.students?.last_name  ?? '',
+        second_last_name: e.students?.second_last_name ?? null,
       })),
       subjects: gradeSubjects.map(gs => ({
         id:         gs.subjects.id,

@@ -22,7 +22,7 @@ export class SectionsController {
     grades: true,
     academic_years: true,
     director: {
-      select: { id: true, first_name: true, last_name: true, document_number: true },
+      select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true, document_number: true },
     },
   } as const
 

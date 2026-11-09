@@ -35,9 +35,11 @@ export class TeacherHoursController {
         school_id: user.school_id,
         ...(q ? {
           OR: [
-            { first_name:      { contains: q, mode: 'insensitive' } },
-            { last_name:       { contains: q, mode: 'insensitive' } },
-            { document_number: { contains: q } },
+            { first_name:       { contains: q, mode: 'insensitive' } },
+            { second_name:      { contains: q, mode: 'insensitive' } },
+            { last_name:        { contains: q, mode: 'insensitive' } },
+            { second_last_name: { contains: q, mode: 'insensitive' } },
+            { document_number:  { contains: q } },
           ],
         } : {}),
       },
@@ -57,7 +59,7 @@ export class TeacherHoursController {
           orderBy: { deduction_date: 'asc' },
         },
       },
-      orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }],
+      orderBy: [{ last_name: 'asc' }, { second_last_name: 'asc' }, { first_name: 'asc' }, { second_name: 'asc' }],
     })
 
     return teachers.map(t => {
@@ -70,10 +72,12 @@ export class TeacherHoursController {
       const payableHours = Math.max(0, monthlyHours - deductedHours)
 
       return {
-        id:              t.id,
-        first_name:      t.first_name,
-        last_name:       t.last_name,
-        document_type:   t.document_type,
+        id:               t.id,
+        first_name:       t.first_name,
+        second_name:      t.second_name,
+        last_name:        t.last_name,
+        second_last_name: t.second_last_name,
+        document_type:    t.document_type,
         document_number: t.document_number,
         escalafon_types: t.escalafon_types,
         contract: contract ? {

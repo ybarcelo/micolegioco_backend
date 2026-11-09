@@ -37,7 +37,7 @@ export class StudentFollowUpController {
 
   private readonly include = {
     academic_periods: { select: { id: true, name: true, period_number: true } },
-    teachers: { select: { id: true, first_name: true, last_name: true } },
+    teachers: { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true } },
   } as const
 
   @Get()

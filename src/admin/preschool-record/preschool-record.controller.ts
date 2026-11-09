@@ -45,9 +45,9 @@ export class PreschoolRecordController {
         },
         select: {
           id:       true,
-          students: { select: { first_name: true, last_name: true } },
+          students: { select: { first_name: true, second_name: true, last_name: true, second_last_name: true } },
         },
-        orderBy: { students: { last_name: 'asc' } },
+        orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
       }),
       this.prisma.preschool_dimension_grades.findMany({
         where: {
@@ -69,9 +69,11 @@ export class PreschoolRecordController {
 
     return {
       students: enrollments.map(e => ({
-        enrollment_id: e.id,
-        first_name:    e.students?.first_name ?? '',
-        last_name:     e.students?.last_name  ?? '',
+        enrollment_id:    e.id,
+        first_name:       e.students?.first_name ?? '',
+        second_name:      e.students?.second_name ?? null,
+        last_name:        e.students?.last_name  ?? '',
+        second_last_name: e.students?.second_last_name ?? null,
       })),
       dimension_grades: dimensionGrades.map(r => ({
         enrollment_id: r.enrollment_id,

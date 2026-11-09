@@ -8,6 +8,7 @@ import {
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { listName, proseName } from '../../common/utils/name.util'
 
 @Controller('admin/reports')
 @Roles('RECTOR', 'SECRETARIO')
@@ -24,6 +25,7 @@ export class ReportsController {
         v.nombre_completo,
         v.birth_date,
         v.gender,
+        v.municipio_expedicion,
         v.grado_actual,
         v.grupo
       FROM view_simat_report v
@@ -108,9 +110,9 @@ export class ReportsController {
           },
           select: {
             id: true,
-            students: { select: { id: true, first_name: true, last_name: true, photo_path: true } },
+            students: { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true, photo_path: true } },
           },
-          orderBy: { students: { last_name: 'asc' } },
+          orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
         }),
         this.prisma.grade_subjects.findMany({
           where: {
@@ -236,11 +238,13 @@ export class ReportsController {
         weight_percentage: period.weight_percentage ? Number(period.weight_percentage) : null,
       } : null,
       students: enrollments.map(e => ({
-        enrollment_id: e.id,
-        student_id:    e.students?.id ?? '',
-        first_name:    e.students?.first_name ?? '',
-        last_name:     e.students?.last_name  ?? '',
-        photo_path:    e.students?.photo_path ?? null,
+        enrollment_id:    e.id,
+        student_id:       e.students?.id ?? '',
+        first_name:       e.students?.first_name ?? '',
+        second_name:      e.students?.second_name ?? null,
+        last_name:        e.students?.last_name  ?? '',
+        second_last_name: e.students?.second_last_name ?? null,
+        photo_path:       e.students?.photo_path ?? null,
       })),
       subjects: gradeSubjects.map(gs => ({
         id:         gs.subjects.id,
@@ -287,8 +291,8 @@ export class ReportsController {
     const [enrollments, records, absences] = await Promise.all([
       this.prisma.enrollments.findMany({
         where:   { section_id: sectionId, status: 'ACTIVE' },
-        select:  { id: true, students: { select: { first_name: true, last_name: true } } },
-        orderBy: { students: { last_name: 'asc' } },
+        select:  { id: true, students: { select: { first_name: true, second_name: true, last_name: true, second_last_name: true } } },
+        orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
       }),
       this.prisma.attendances.findMany({
         where: { academic_period_id: periodId, enrollments: { section_id: sectionId } },
@@ -320,7 +324,9 @@ export class ReportsController {
       return {
         enrollment_id:        e.id,
         first_name:           e.students?.first_name ?? '',
+        second_name:          e.students?.second_name ?? null,
         last_name:            e.students?.last_name  ?? '',
+        second_last_name:     e.students?.second_last_name ?? null,
         total_classes:        studentRecords.length,
         total_absent_records: studentRecords.filter(r => !r.present).length,
         period_absence_days:  absenceMap.get(e.id) ?? 0,
@@ -347,7 +353,7 @@ export class ReportsController {
         created_at: true,
         enrollments: {
           select: {
-            students: { select: { first_name: true, last_name: true } },
+            students: { select: { first_name: true, second_name: true, last_name: true, second_last_name: true } },
             sections: {
               select: {
                 name:   true,
@@ -357,22 +363,23 @@ export class ReportsController {
           },
         },
         subjects: { select: { name: true } },
-        teachers: { select: { first_name: true, last_name: true } },
+        teachers: { select: { first_name: true, second_name: true, last_name: true, second_last_name: true } },
       },
       orderBy: [
         { enrollments: { sections: { grades: { level: 'asc' } } } },
         { enrollments: { students: { last_name: 'asc' } } },
+        { enrollments: { students: { second_last_name: 'asc' } } },
       ],
     })
 
     return rows.map(r => ({
       id:           r.id,
-      student_name: `${r.enrollments?.students?.last_name ?? ''}, ${r.enrollments?.students?.first_name ?? ''}`,
+      student_name: r.enrollments?.students ? listName(r.enrollments.students) : '',
       grade_name:   r.enrollments?.sections?.grades?.name  ?? '',
       grade_level:  r.enrollments?.sections?.grades?.level ?? 0,
       section_name: r.enrollments?.sections?.name ?? '',
       subject_name: r.subjects?.name ?? '',
-      teacher_name: r.teachers ? `${r.teachers.first_name} ${r.teachers.last_name}` : '',
+      teacher_name: r.teachers ? proseName(r.teachers) : '',
       reason_1:     r.reason_1,
       reason_2:     r.reason_2,
       reason_3:     r.reason_3,

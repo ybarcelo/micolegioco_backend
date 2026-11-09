@@ -14,6 +14,7 @@ import {
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { listName } from '../../common/utils/name.util'
 
 const PAGE_SIZE = 25
 
@@ -73,7 +74,9 @@ export class EnrollmentsController {
       where.students = {
         OR: [
           { first_name: { contains: q, mode: 'insensitive' } },
+          { second_name: { contains: q, mode: 'insensitive' } },
           { last_name: { contains: q, mode: 'insensitive' } },
+          { second_last_name: { contains: q, mode: 'insensitive' } },
           { document_number: { contains: q, mode: 'insensitive' } },
         ],
       }
@@ -129,7 +132,7 @@ export class EnrollmentsController {
         school_id: user.school_id,
         status: { in: ['PROSPECTIVE', 'ACTIVE'] },
       },
-      select: { id: true, first_name: true, last_name: true },
+      select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true },
     })
     const foundIds = new Set(students.map(s => s.id))
 
@@ -149,7 +152,7 @@ export class EnrollmentsController {
 
     const toCreate = students.filter(s => {
       if (enrolledSet.has(s.id)) {
-        errors.push({ student_id: s.id, name: `${s.last_name}, ${s.first_name}`, reason: 'Ya está matriculado en esta sección' })
+        errors.push({ student_id: s.id, name: listName(s), reason: 'Ya está matriculado en esta sección' })
         return false
       }
       return true
@@ -163,7 +166,7 @@ export class EnrollmentsController {
     if (toCreate.length > available) {
       const overflow = toCreate.splice(available)
       for (const s of overflow) {
-        errors.push({ student_id: s.id, name: `${s.last_name}, ${s.first_name}`, reason: 'Sección sin capacidad disponible' })
+        errors.push({ student_id: s.id, name: listName(s), reason: 'Sección sin capacidad disponible' })
       }
     }
 

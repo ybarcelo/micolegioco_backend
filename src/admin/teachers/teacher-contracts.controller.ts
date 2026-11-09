@@ -7,7 +7,7 @@ import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.de
 import { PrismaService } from '../../prisma/prisma.service'
 
 const CONTRACT_INCLUDE = {
-  teachers:        { select: { id: true, first_name: true, last_name: true, document_number: true } },
+  teachers:        { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true, document_number: true } },
   escalafon_types: true,
   teacher_contract_subjects: {
     include: {

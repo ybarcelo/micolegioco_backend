@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { proseName } from '../../common/utils/name.util'
 
 @Controller('admin/meetings')
 export class MeetingsController {
@@ -27,7 +28,7 @@ export class MeetingsController {
         scheduled_datetime: { gte: todayStart, lt: weekEnd },
       },
       include: {
-        students:  { select: { id: true, first_name: true, last_name: true } },
+        students:  { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true } },
         guardians: { select: { first_name: true, last_name: true } },
       },
       orderBy: { scheduled_datetime: 'asc' },
@@ -36,7 +37,7 @@ export class MeetingsController {
     return meetings.map(m => ({
       id:                 m.id,
       student_id:         m.student_id,
-      student_name:       m.students  ? `${m.students.first_name} ${m.students.last_name}`  : '',
+      student_name:       m.students  ? proseName(m.students) : '',
       guardian_name:      m.guardians ? `${m.guardians.first_name} ${m.guardians.last_name}` : null,
       meeting_reason:     m.meeting_reason,
       scheduled_datetime: m.scheduled_datetime,
