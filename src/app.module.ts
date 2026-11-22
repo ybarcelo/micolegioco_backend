@@ -37,6 +37,8 @@ import { PreschoolDimensionsModule } from './admin/preschool-dimensions/preschoo
 import { MeetingsModule } from './admin/meetings/meetings.module'
 import { PreInformeReasonsModule } from './admin/pre-informe-reasons/pre-informe-reasons.module'
 import { IcfesResultsModule } from './admin/icfes-results/icfes-results.module'
+import { TeacherLoansModule } from './admin/teacher-loans/teacher-loans.module'
+import { PayrollExportModule } from './admin/payroll-export/payroll-export.module'
 
 @Module({
   imports: [
@@ -88,6 +90,8 @@ import { IcfesResultsModule } from './admin/icfes-results/icfes-results.module'
     MeetingsModule,
     PreInformeReasonsModule,
     IcfesResultsModule,
+    TeacherLoansModule,
+    PayrollExportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

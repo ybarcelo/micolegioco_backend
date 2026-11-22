@@ -302,6 +302,10 @@ model schools {
   created_at             DateTime?                @default(now()) @db.Timestamptz(6)
   academic_snapshot             Json?     @default("{}")
   academic_snapshot_computed_at DateTime? @db.Timestamptz(6)
+  payroll_bank                  String?   @db.VarChar(20)
+  payroll_debit_account_number  String?   @db.VarChar(20)
+  payroll_debit_account_type    String?   @db.VarChar(10)
+  teacher_loans_enabled         Boolean   @default(false)
   academic_years          academic_years[]
   academic_periods        academic_periods[]
   benefit_types           benefit_types[]
@@ -344,6 +348,7 @@ model schools {
   certificates                 certificates[]
   pre_informe_reasons          pre_informe_reasons[]
   icfes_results                icfes_results[]
+  teacher_loans                teacher_loans[]
   preschool_dimensions         preschool_dimensions[]
   preschool_indicators         preschool_indicators[]
 }
@@ -542,6 +547,8 @@ model users {
   schools         schools?          @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   attendances     attendances[]
   certificates    certificates[]
+  teacher_loans_authorized teacher_loans[] @relation("TeacherLoanAuthorized")
+  teacher_loans_requested  teacher_loans[] @relation("TeacherLoanRequested")
 }
 
 // ── Módulo de Docentes ───────────────────────────────────
@@ -575,6 +582,10 @@ model teachers {
   phone_mobile              String?                   @db.VarChar(20)
   escalafon_type_id         String?                   @db.Uuid
   profession                String?                   @db.VarChar(100)
+  bank_name                 String?                   @db.VarChar(60)
+  bank_code                 String?                   @db.VarChar(10)
+  bank_account_type         String?                   @db.VarChar(10)
+  bank_account_number       String?                   @db.VarChar(30)
   created_at                DateTime?                 @default(now()) @db.Timestamptz(6)
   updated_at                DateTime?                 @default(now()) @db.Timestamptz(6)
   users                     users?                    @relation(fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
@@ -582,6 +593,7 @@ model teachers {
   schools                   schools                   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   teacher_contracts         teacher_contracts[]
   teacher_hour_deductions   teacher_hour_deductions[]
+  teacher_loans             teacher_loans[]
   directed_sections         sections[]                @relation("section_director")
   grade_subjects            grade_subjects[]
   student_follow_up_records student_follow_up_records[]
@@ -589,6 +601,43 @@ model teachers {
 
   @@unique([school_id, document_number])
   @@index([school_id], map: "idx_teachers_school")
+}
+
+model teacher_loans {
+  id                 String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String                      @db.Uuid
+  teacher_id         String                      @db.Uuid
+  authorized_by      String?                     @db.Uuid
+  requested_by       String?                     @db.Uuid
+  amount             Decimal                     @db.Decimal(15, 2)
+  installments_count Int
+  start_year         Int?
+  start_month        Int?
+  status             String                      @default("ACTIVE") @db.VarChar(20)
+  notes              String?
+  rejection_reason   String?
+  created_at         DateTime?                   @default(now()) @db.Timestamptz(6)
+  schools            schools                     @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  teachers           teachers                    @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  authorized_by_user users?                      @relation("TeacherLoanAuthorized", fields: [authorized_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  requested_by_user  users?                      @relation("TeacherLoanRequested", fields: [requested_by], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  installments       teacher_loan_installments[]
+
+  @@index([school_id, teacher_id], map: "idx_teacher_loans_school_teacher")
+}
+
+model teacher_loan_installments {
+  id                 String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  loan_id            String        @db.Uuid
+  installment_number Int
+  year               Int
+  month              Int
+  amount             Decimal       @db.Decimal(15, 2)
+  created_at         DateTime?     @default(now()) @db.Timestamptz(6)
+  teacher_loans      teacher_loans @relation(fields: [loan_id], references: [id], onDelete: Cascade)
+
+  @@unique([loan_id, installment_number])
+  @@index([loan_id, year, month], map: "idx_tli_loan_year_month")
 }
 
 model teacher_contracts {

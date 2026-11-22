@@ -16,7 +16,14 @@ async function main() {
     process.exit(1)
   }
 
-  const client = new Client({ connectionString: databaseUrl })
+  // Railway's public proxy presents a self-signed cert in the chain; a plain
+  // localhost connection needs no TLS at all. Only relax verification for the
+  // remote case, scoped to this one client — never disable it process-wide.
+  const isLocal = /^(postgresql|postgres):\/\/[^@]+@(localhost|127\.0\.0\.1)/.test(databaseUrl)
+  const client = new Client({
+    connectionString: databaseUrl,
+    ssl: isLocal ? undefined : { rejectUnauthorized: false },
+  })
   await client.connect()
 
   await client.query(`

@@ -24,13 +24,16 @@ export class TeacherController {
   async getMe(@CurrentUser() user: JwtPayload) {
     if (!user.teacher_id) throw new ForbiddenException('No teacher profile linked to this account')
 
-    const teacher = await this.prisma.teachers.findFirst({
-      where: { id: user.teacher_id, school_id: user.school_id },
-      include: {
-        escalafon_types: { select: { id: true, name: true } },
-        users:           { select: { email: true } },
-      },
-    })
+    const [teacher, school] = await Promise.all([
+      this.prisma.teachers.findFirst({
+        where: { id: user.teacher_id, school_id: user.school_id },
+        include: {
+          escalafon_types: { select: { id: true, name: true } },
+          users:           { select: { email: true } },
+        },
+      }),
+      this.prisma.schools.findUnique({ where: { id: user.school_id }, select: { teacher_loans_enabled: true } }),
+    ])
     if (!teacher) throw new NotFoundException('Perfil de docente no encontrado')
 
     return {
@@ -47,6 +50,7 @@ export class TeacherController {
       profession:      teacher.profession,
       escalafon:       teacher.escalafon_types?.name ?? null,
       email:           teacher.users?.email ?? null,
+      teacher_loans_enabled: school?.teacher_loans_enabled ?? false,
     }
   }
 

@@ -47,6 +47,10 @@ export class SchoolAdminController {
         privacy_policy_url: true,
         enrollment_opens_at: true,
         enrollment_closes_at: true,
+        payroll_bank: true,
+        payroll_debit_account_number: true,
+        payroll_debit_account_type: true,
+        teacher_loans_enabled: true,
       },
     })
 
@@ -58,8 +62,14 @@ export class SchoolAdminController {
   @Roles('RECTOR')
   async updateSchool(
     @CurrentUser() user: JwtPayload,
-    @Body() body: { name?: string; address?: string; city?: string; phone?: string; email?: string; dane_code?: string; logo?: string; rector_name?: string; rector_signature?: string; secretary_name?: string; secretary_signature?: string; resolution_number?: string; calendar?: string; slug?: string; privacy_policy_url?: string; enrollment_opens_at?: string; enrollment_closes_at?: string },
+    @Body() body: { name?: string; address?: string; city?: string; phone?: string; email?: string; dane_code?: string; logo?: string; rector_name?: string; rector_signature?: string; secretary_name?: string; secretary_signature?: string; resolution_number?: string; calendar?: string; slug?: string; privacy_policy_url?: string; enrollment_opens_at?: string; enrollment_closes_at?: string; payroll_bank?: string; payroll_debit_account_number?: string; payroll_debit_account_type?: string; teacher_loans_enabled?: boolean },
   ) {
+    if (body.payroll_bank !== undefined && body.payroll_bank !== null && !['BANCOLOMBIA', 'BANCO_BOGOTA'].includes(body.payroll_bank)) {
+      throw new BadRequestException('Banco de nómina inválido')
+    }
+    if (body.payroll_debit_account_type !== undefined && body.payroll_debit_account_type !== null && !['AHORROS', 'CORRIENTE'].includes(body.payroll_debit_account_type)) {
+      throw new BadRequestException('Tipo de cuenta de débito inválido')
+    }
     const school = await this.prisma.schools.findUnique({ where: { id: user.school_id } })
     if (!school) throw new NotFoundException('School not found')
 
@@ -142,6 +152,10 @@ export class SchoolAdminController {
           privacy_policy_url: privacyPolicyUrl       !== undefined ? privacyPolicyUrl       : school.privacy_policy_url,
           enrollment_opens_at:  finalOpensAt,
           enrollment_closes_at: finalClosesAt,
+          payroll_bank:                  body.payroll_bank                  !== undefined ? body.payroll_bank                  : school.payroll_bank,
+          payroll_debit_account_number:  body.payroll_debit_account_number  !== undefined ? body.payroll_debit_account_number  : school.payroll_debit_account_number,
+          payroll_debit_account_type:    body.payroll_debit_account_type    !== undefined ? body.payroll_debit_account_type    : school.payroll_debit_account_type,
+          teacher_loans_enabled:         body.teacher_loans_enabled         !== undefined ? body.teacher_loans_enabled         : school.teacher_loans_enabled,
         },
         select: {
           id: true,
@@ -163,6 +177,10 @@ export class SchoolAdminController {
           privacy_policy_url: true,
           enrollment_opens_at: true,
           enrollment_closes_at: true,
+          payroll_bank: true,
+          payroll_debit_account_number: true,
+          payroll_debit_account_type: true,
+          teacher_loans_enabled: true,
         },
       })
 

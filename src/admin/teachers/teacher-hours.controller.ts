@@ -5,10 +5,11 @@ import {
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { PayrollCalcService } from './payroll-calc.service'
 
 @Controller('admin/teacher-hours')
 export class TeacherHoursController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private payrollCalc: PayrollCalcService) {}
 
   /**
    * GET /admin/teacher-hours?year=2025&month=4&q=garcia
@@ -58,18 +59,27 @@ export class TeacherHoursController {
           where: { year, month },
           orderBy: { deduction_date: 'asc' },
         },
+        teacher_loans: {
+          where: { status: 'ACTIVE' },
+          select: { id: true, amount: true, installments_count: true, start_year: true, start_month: true },
+        },
       },
       orderBy: [{ last_name: 'asc' }, { second_last_name: 'asc' }, { first_name: 'asc' }, { second_name: 'asc' }],
     })
 
+    const loanDeductions = await this.payrollCalc.getLoanDeductionsForMonth(
+      user.school_id!, year, month, teachers.map(t => t.id),
+    )
+
     return teachers.map(t => {
       const contract      = t.teacher_contracts[0] ?? null
       const weeklyHours   = contract?.weekly_hours ?? 0
-      const monthlyHours  = weeklyHours * 4
+      const hourlyRate    = contract?.escalafon_types.hourly_rate ? Number(contract.escalafon_types.hourly_rate) : null
       const deductedHours = t.teacher_hour_deductions.reduce(
         (sum, d) => sum + Number(d.hours), 0,
       )
-      const payableHours = Math.max(0, monthlyHours - deductedHours)
+      const loanDeduction = loanDeductions.get(t.id) ?? 0
+      const payroll = this.payrollCalc.computeValue(weeklyHours, hourlyRate, deductedHours, loanDeduction)
 
       return {
         id:               t.id,
@@ -83,7 +93,7 @@ export class TeacherHoursController {
         contract: contract ? {
           id:             contract.id,
           weekly_hours:   contract.weekly_hours,
-          monthly_hours:  monthlyHours,
+          monthly_hours:  payroll.monthly_hours,
           escalafon_types: contract.escalafon_types,
         } : null,
         deductions:      t.teacher_hour_deductions.map(d => ({
@@ -93,7 +103,16 @@ export class TeacherHoursController {
           reason:         d.reason,
         })),
         deducted_hours:  deductedHours,
-        payable_hours:   payableHours,
+        payable_hours:   payroll.payable_hours,
+        hourly_rate:     payroll.hourly_rate,
+        gross_value:     payroll.gross_value,
+        loan_deduction:  payroll.loan_deduction,
+        net_value:       payroll.net_value,
+        active_loans:    t.teacher_loans.map(l => ({
+          id: l.id, amount: Number(l.amount), installments_count: l.installments_count,
+          start_year: l.start_year, start_month: l.start_month,
+        })),
+        missing_bank_info: !t.bank_account_number,
       }
     })
   }

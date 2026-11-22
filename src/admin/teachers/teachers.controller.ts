@@ -54,6 +54,7 @@ export class TeachersController {
       document_type: string; document_number: string; exp_city?: string
       address?: string; phone_mobile?: string
       escalafon_type_id?: string; profession?: string
+      bank_name?: string; bank_code?: string; bank_account_type?: string; bank_account_number?: string
     },
   ) {
     if (!body.first_name)       throw new BadRequestException('first_name is required')
@@ -76,6 +77,10 @@ export class TeachersController {
           phone_mobile:      body.phone_mobile       ?? null,
           escalafon_type_id: body.escalafon_type_id ?? null,
           profession:        body.profession         ?? null,
+          bank_name:           body.bank_name           ?? null,
+          bank_code:           body.bank_code           ?? null,
+          bank_account_type:   body.bank_account_type   ?? null,
+          bank_account_number: body.bank_account_number ?? null,
         },
         include: { escalafon_types: true },
       })
@@ -112,6 +117,10 @@ export class TeachersController {
           phone_mobile:      body.phone_mobile      !== undefined ? body.phone_mobile   : teacher.phone_mobile,
           escalafon_type_id: body.escalafon_type_id !== undefined ? body.escalafon_type_id : teacher.escalafon_type_id,
           profession:        body.profession        !== undefined ? body.profession     : teacher.profession,
+          bank_name:           body.bank_name           !== undefined ? body.bank_name           : teacher.bank_name,
+          bank_code:           body.bank_code           !== undefined ? body.bank_code           : teacher.bank_code,
+          bank_account_type:   body.bank_account_type   !== undefined ? body.bank_account_type   : teacher.bank_account_type,
+          bank_account_number: body.bank_account_number !== undefined ? body.bank_account_number : teacher.bank_account_number,
           updated_at:        new Date(),
         },
         include: { escalafon_types: true },
