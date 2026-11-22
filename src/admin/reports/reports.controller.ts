@@ -273,6 +273,199 @@ export class ReportsController {
     }
   }
 
+  /**
+   * Promedio general por estudiante, combinando todos los períodos del año académico
+   * que ya tienen notas registradas ("ejecutados"). Por cada materia/área se promedia
+   * entre los períodos ejecutados (o, si el colegio usa escala de puntos acumulada, se
+   * toma el acumulado del último período ejecutado); el promedio general es el promedio
+   * de esos valores entre materias/áreas, para que ninguna pese más por tener más períodos.
+   */
+  @Get('general-average')
+  async getGeneralAverageReport(
+    @CurrentUser() user: JwtPayload,
+    @Query('section_id') sectionId: string,
+  ) {
+    if (!sectionId) throw new BadRequestException('section_id is required')
+
+    const section = await this.prisma.sections.findFirst({
+      where: { id: sectionId, grades: { school_id: user.school_id } },
+      select: { grade_id: true, academic_year_id: true },
+    })
+    if (!section) throw new NotFoundException('Sección no encontrada')
+
+    const [config, periods, enrollments, gradeSubjects] = await Promise.all([
+      this.prisma.grading_scale_config.findUnique({ where: { school_id: user.school_id } }),
+      this.prisma.academic_periods.findMany({
+        where: { academic_year_id: section.academic_year_id, school_id: user.school_id },
+        orderBy: { period_number: 'asc' },
+        select: { id: true, name: true, period_number: true },
+      }),
+      this.prisma.enrollments.findMany({
+        where: { section_id: sectionId, status: 'ACTIVE', sections: { grades: { school_id: user.school_id } } },
+        select: {
+          id: true,
+          students: { select: { id: true, first_name: true, second_name: true, last_name: true, second_last_name: true, photo_path: true } },
+        },
+        orderBy: [{ students: { last_name: 'asc' } }, { students: { second_last_name: 'asc' } }, { students: { first_name: 'asc' } }],
+      }),
+      this.prisma.grade_subjects.findMany({
+        where: { school_id: user.school_id, grade_id: section.grade_id, academic_year_id: section.academic_year_id },
+        select: {
+          subject_id: true,
+          subjects: {
+            select: { id: true, name: true, sort_order: true, subject_areas: { select: { id: true, name: true, sort_order: true } } },
+          },
+        },
+        orderBy: [{ subjects: { subject_areas: { sort_order: 'asc' } } }, { subjects: { sort_order: 'asc' } }],
+      }),
+    ])
+
+    const resolvedConfig = config ?? { scale_type: 'NUMERIC', cumulative: true }
+    const isPoints = resolvedConfig.scale_type === 'POINTS'
+    const periodIds = periods.map(p => p.id)
+
+    let columns: { id: string; name: string }[]
+    let executedPeriods = periods
+    // enrollment_id -> column_id -> valores a promediar (o a sumar, para puntos acumulados)
+    const perStudentColumnValues = new Map<string, Map<string, number[]>>()
+    let sumInsteadOfAverage = false
+
+    // Filas crudas (enrollment_id, column_id, value, academic_period_id), guardadas para
+    // poder calcular también el promedio de cada período individualmente (ver más abajo).
+    let rawRows: { enrollment_id: string; column_id: string; value: number; academic_period_id: string }[] = []
+
+    function pushValue(enrollmentId: string, columnId: string, value: number) {
+      const sMap = perStudentColumnValues.get(enrollmentId) ?? new Map<string, number[]>()
+      const arr = sMap.get(columnId) ?? []
+      arr.push(value)
+      sMap.set(columnId, arr)
+      perStudentColumnValues.set(enrollmentId, sMap)
+    }
+
+    const periodNumberById = new Map(periods.map(p => [p.id, p.period_number]))
+
+    if (isPoints) {
+      const areaMap = new Map<string, { id: string; name: string; sort_order: number }>()
+      for (const gs of gradeSubjects) {
+        const a = gs.subjects.subject_areas
+        if (a?.id && !areaMap.has(a.id)) areaMap.set(a.id, { id: a.id, name: a.name, sort_order: a.sort_order ?? 0 })
+      }
+      columns = [...areaMap.values()].sort((a, b) => a.sort_order - b.sort_order)
+
+      const allAreaGrades = await this.prisma.student_area_grades.findMany({
+        where: { school_id: user.school_id, academic_period_id: { in: periodIds }, enrollments: { section_id: sectionId } },
+        select: { enrollment_id: true, subject_area_id: true, points: true, academic_period_id: true },
+      })
+      rawRows = allAreaGrades.map(g => ({
+        enrollment_id: g.enrollment_id, column_id: g.subject_area_id, value: g.points, academic_period_id: g.academic_period_id,
+      }))
+
+      const periodsWithData = new Set(allAreaGrades.map(g => g.academic_period_id))
+      executedPeriods = periods.filter(p => periodsWithData.has(p.id))
+
+      if (resolvedConfig.cumulative) {
+        sumInsteadOfAverage = true
+        if (executedPeriods.length > 0) {
+          const latestPeriodNumber = executedPeriods[executedPeriods.length - 1].period_number
+          for (const g of allAreaGrades) {
+            if ((periodNumberById.get(g.academic_period_id) ?? Infinity) <= latestPeriodNumber) {
+              pushValue(g.enrollment_id, g.subject_area_id, g.points)
+            }
+          }
+        }
+      } else {
+        for (const g of allAreaGrades) pushValue(g.enrollment_id, g.subject_area_id, g.points)
+      }
+    } else {
+      columns = gradeSubjects.map(gs => ({ id: gs.subjects.id, name: gs.subjects.name }))
+
+      const allGrades = await this.prisma.student_grades.findMany({
+        where: {
+          school_id: user.school_id,
+          academic_period_id: { in: periodIds },
+          enrollments: { section_id: sectionId },
+          numeric_grade: { not: null },
+        },
+        select: { enrollment_id: true, subject_id: true, numeric_grade: true, academic_period_id: true },
+      })
+      rawRows = allGrades.map(g => ({
+        enrollment_id: g.enrollment_id, column_id: g.subject_id, value: Number(g.numeric_grade), academic_period_id: g.academic_period_id,
+      }))
+
+      const periodsWithData = new Set(allGrades.map(g => g.academic_period_id))
+      executedPeriods = periods.filter(p => periodsWithData.has(p.id))
+
+      for (const g of allGrades) pushValue(g.enrollment_id, g.subject_id, Number(g.numeric_grade))
+    }
+
+    // Promedio de CADA período ejecutado por separado (para la vista sin desglose por materia):
+    // en escala de puntos acumulada, el valor de un período es el acumulado hasta ese período
+    // (igual que en el reporte de Notas de un solo período); en los demás casos, es el promedio
+    // de ese período únicamente.
+    const perStudentPerPeriod = new Map<string, Record<string, number | null>>()
+    for (const period of executedPeriods) {
+      const columnValuesThisPeriod = new Map<string, Map<string, number>>()
+      for (const row of rawRows) {
+        const includeRow = sumInsteadOfAverage
+          ? (periodNumberById.get(row.academic_period_id) ?? Infinity) <= period.period_number
+          : row.academic_period_id === period.id
+        if (!includeRow) continue
+        const sMap = columnValuesThisPeriod.get(row.enrollment_id) ?? new Map<string, number>()
+        sMap.set(row.column_id, (sMap.get(row.column_id) ?? 0) + row.value)
+        columnValuesThisPeriod.set(row.enrollment_id, sMap)
+      }
+      for (const [enrollmentId, colMap] of columnValuesThisPeriod) {
+        const values = [...colMap.values()]
+        const avg = values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : null
+        const rec = perStudentPerPeriod.get(enrollmentId) ?? {}
+        rec[period.id] = avg
+        perStudentPerPeriod.set(enrollmentId, rec)
+      }
+    }
+
+    const students = enrollments.map(e => {
+      const sMap = perStudentColumnValues.get(e.id)
+      const columnAverages: number[] = []
+      const perColumn: Record<string, number | null> = {}
+      for (const col of columns) {
+        const values = sMap?.get(col.id)
+        if (!values || values.length === 0) { perColumn[col.id] = null; continue }
+        const total = values.reduce((s, v) => s + v, 0)
+        const value = sumInsteadOfAverage ? total : total / values.length
+        perColumn[col.id] = value
+        columnAverages.push(value)
+      }
+      const overallAverage = columnAverages.length > 0
+        ? columnAverages.reduce((s, v) => s + v, 0) / columnAverages.length
+        : null
+
+      const perPeriod: Record<string, number | null> = {}
+      for (const period of executedPeriods) perPeriod[period.id] = perStudentPerPeriod.get(e.id)?.[period.id] ?? null
+
+      return {
+        enrollment_id:     e.id,
+        student_id:        e.students?.id ?? '',
+        first_name:        e.students?.first_name ?? '',
+        second_name:       e.students?.second_name ?? null,
+        last_name:         e.students?.last_name ?? '',
+        second_last_name:  e.students?.second_last_name ?? null,
+        photo_path:        e.students?.photo_path ?? null,
+        per_column:        perColumn,
+        per_period:        perPeriod,
+        overall_average:   overallAverage,
+        graded_columns:    columnAverages.length,
+        total_columns:     columns.length,
+      }
+    })
+
+    return {
+      config: { scale_type: resolvedConfig.scale_type, cumulative: resolvedConfig.cumulative },
+      executed_periods: executedPeriods.map(p => ({ id: p.id, name: p.name, period_number: p.period_number })),
+      columns,
+      students,
+    }
+  }
+
   /** Asistencia agregada por estudiante en una sección y período, sin restringir por profesor/materia */
   @Get('attendance')
   async getAttendanceReport(

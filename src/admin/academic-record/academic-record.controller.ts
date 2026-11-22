@@ -26,7 +26,7 @@ export class AcademicRecordController {
         id: true, school_id: true, scale_type: true, cumulative: true,
         bulletin_header: true, include_achievements: true, secondary_logo: true,
         include_convivencia: true, convivencia_scale: true,
-        bulletin_header_html: true,
+        bulletin_header_html: true, preschool_grading_mode: true,
         created_at: true, updated_at: true,
       },
     })
@@ -39,6 +39,7 @@ export class AcademicRecordController {
         cumulative:           true,
         bulletin_header:      'LOGO_LEFT',
         include_achievements: true,
+        preschool_grading_mode: 'DIMENSIONS',
       },
     })
   }
@@ -65,6 +66,7 @@ export class AcademicRecordController {
       include_convivencia?:   boolean
       convivencia_scale?:     string
       bulletin_header_html?:  string | null
+      preschool_grading_mode?: string
     },
   ) {
     if (body.scale_type && !['NUMERIC', 'QUALITATIVE', 'POINTS'].includes(body.scale_type))
@@ -75,6 +77,9 @@ export class AcademicRecordController {
 
     if (body.convivencia_scale && !['QUALITATIVE', 'NUMERIC'].includes(body.convivencia_scale))
       throw new BadRequestException('convivencia_scale must be QUALITATIVE or NUMERIC')
+
+    if (body.preschool_grading_mode && !['SUBJECTS', 'DIMENSIONS'].includes(body.preschool_grading_mode))
+      throw new BadRequestException('preschool_grading_mode must be SUBJECTS or DIMENSIONS')
 
     const sanitizedHeaderHtml = body.bulletin_header_html != null
       ? this.sanitizeHeaderHtml(body.bulletin_header_html)
@@ -92,6 +97,7 @@ export class AcademicRecordController {
         include_convivencia:  body.include_convivencia   ?? false,
         convivencia_scale:    body.convivencia_scale     ?? 'QUALITATIVE',
         bulletin_header_html: sanitizedHeaderHtml        ?? null,
+        preschool_grading_mode: body.preschool_grading_mode ?? 'DIMENSIONS',
         updated_at:           new Date(),
       },
       update: {
@@ -103,6 +109,7 @@ export class AcademicRecordController {
         ...(body.include_convivencia   !== undefined ? { include_convivencia:   body.include_convivencia   } : {}),
         ...(body.convivencia_scale     !== undefined ? { convivencia_scale:     body.convivencia_scale     } : {}),
         ...(body.bulletin_header_html  !== undefined ? { bulletin_header_html:  sanitizedHeaderHtml ?? null } : {}),
+        ...(body.preschool_grading_mode !== undefined ? { preschool_grading_mode: body.preschool_grading_mode } : {}),
         updated_at: new Date(),
       },
     })

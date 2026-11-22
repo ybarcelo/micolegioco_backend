@@ -24,8 +24,25 @@ model academic_years {
   student_benefits student_benefits[]
   student_piars    student_piars[]
   enrollment_sequences enrollment_sequences[]
+  icfes_results    icfes_results[]
 
   @@unique([school_id, label])
+}
+
+model icfes_results {
+  id               String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id        String         @db.Uuid
+  academic_year_id String         @db.Uuid
+  global_score     Int
+  classification   String         @db.VarChar(5)
+  notes            String?
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  schools          schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  academic_years   academic_years @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
+
+  @@unique([school_id, academic_year_id])
+  @@index([school_id])
 }
 
 model academic_periods {
@@ -283,6 +300,8 @@ model schools {
   enrollment_opens_at    DateTime?                @db.Date
   enrollment_closes_at   DateTime?                @db.Date
   created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  academic_snapshot             Json?     @default("{}")
+  academic_snapshot_computed_at DateTime? @db.Timestamptz(6)
   academic_years          academic_years[]
   academic_periods        academic_periods[]
   benefit_types           benefit_types[]
@@ -323,6 +342,10 @@ model schools {
   pre_informes                 pre_informes[]
   enrollment_sequences         enrollment_sequences[]
   certificates                 certificates[]
+  pre_informe_reasons          pre_informe_reasons[]
+  icfes_results                icfes_results[]
+  preschool_dimensions         preschool_dimensions[]
+  preschool_indicators         preschool_indicators[]
 }
 
 model service_fees {
@@ -689,6 +712,7 @@ model grading_scale_config {
   include_convivencia  Boolean   @default(false)
   convivencia_scale    String    @default("QUALITATIVE") @db.VarChar(20)
   bulletin_header_html String?
+  preschool_grading_mode String  @default("DIMENSIONS") @db.VarChar(20)
   created_at           DateTime? @default(now()) @db.Timestamptz(6)
   updated_at           DateTime? @default(now()) @db.Timestamptz(6)
   schools              schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -738,6 +762,16 @@ model pre_informes {
   @@index([school_id])
   @@index([academic_period_id])
   @@index([teacher_id])
+}
+
+model pre_informe_reasons {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id  String    @db.Uuid
+  label      String    @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  schools    schools   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -866,47 +900,87 @@ model attendances {
 
 // ── Módulo Calificación Preescolar ───────────────────────────────────────────
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model preschool_dimension_grades {
-  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  school_id          String           @db.Uuid
-  enrollment_id      String           @db.Uuid
-  academic_period_id String           @db.Uuid
-  dimension          String           @db.VarChar(20)
-  rating             String           @db.VarChar(20)
-  notes              String?
-  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
-  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
-  enrollments        enrollments      @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
-  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+model preschool_dimensions {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id   String    @db.Uuid
+  name        String    @db.VarChar(100)
+  description String?   @db.VarChar(255)
+  sort_order  Int       @default(0) @db.SmallInt
+  code        String?   @db.VarChar(20)
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  schools                    schools                      @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  preschool_indicators       preschool_indicators[]
+  preschool_dimension_grades preschool_dimension_grades[]
+  preschool_indicator_grades preschool_indicator_grades[]
 
-  @@unique([enrollment_id, academic_period_id, dimension])
+  @@unique([school_id, name])
   @@index([school_id])
-  @@index([enrollment_id])
-  @@index([academic_period_id])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model preschool_indicator_grades {
-  id                 String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  school_id          String           @db.Uuid
-  enrollment_id      String           @db.Uuid
-  academic_period_id String           @db.Uuid
-  dimension          String           @db.VarChar(20)
-  indicator_key      String           @db.VarChar(60)
-  rating             String           @db.VarChar(20)
-  notes              String?
-  created_at         DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime?        @default(now()) @db.Timestamptz(6)
-  schools            schools          @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
-  enrollments        enrollments      @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
-  academic_periods   academic_periods @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+model preschool_indicators {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id    String    @db.Uuid
+  dimension_id String    @db.Uuid
+  name         String    @db.VarChar(150)
+  sort_order   Int       @default(0) @db.SmallInt
+  code         String?   @db.VarChar(60)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  schools              schools              @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  preschool_dimensions preschool_dimensions @relation(fields: [dimension_id], references: [id], onDelete: Cascade)
+  preschool_indicator_grades preschool_indicator_grades[]
 
-  @@unique([enrollment_id, academic_period_id, dimension, indicator_key])
+  @@unique([dimension_id, name])
+  @@index([school_id])
+  @@index([dimension_id])
+}
+
+model preschool_dimension_grades {
+  id                 String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String               @db.Uuid
+  enrollment_id      String               @db.Uuid
+  academic_period_id String               @db.Uuid
+  dimension_id       String               @db.Uuid
+  rating             String               @db.VarChar(20)
+  notes              String?
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  schools              schools              @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments          enrollments          @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods     academic_periods     @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  preschool_dimensions preschool_dimensions @relation(fields: [dimension_id],       references: [id], onDelete: Cascade)
+
+  @@unique([enrollment_id, academic_period_id, dimension_id])
   @@index([school_id])
   @@index([enrollment_id])
   @@index([academic_period_id])
+  @@index([dimension_id])
+}
+
+model preschool_indicator_grades {
+  id                 String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id          String               @db.Uuid
+  enrollment_id      String               @db.Uuid
+  academic_period_id String               @db.Uuid
+  dimension_id       String               @db.Uuid
+  indicator_id       String               @db.Uuid
+  rating             String               @db.VarChar(20)
+  notes              String?
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  schools              schools              @relation(fields: [school_id],          references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollments          enrollments          @relation(fields: [enrollment_id],      references: [id], onDelete: Cascade, onUpdate: NoAction)
+  academic_periods     academic_periods     @relation(fields: [academic_period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  preschool_dimensions preschool_dimensions @relation(fields: [dimension_id],       references: [id], onDelete: Cascade)
+  preschool_indicators preschool_indicators @relation(fields: [indicator_id],       references: [id], onDelete: Cascade)
+
+  @@unique([enrollment_id, academic_period_id, indicator_id])
+  @@index([school_id])
+  @@index([enrollment_id])
+  @@index([academic_period_id])
+  @@index([dimension_id])
+  @@index([indicator_id])
 }
 
 // ── Módulo Convivencia ───────────────────────────────────────────────────────

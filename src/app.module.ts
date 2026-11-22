@@ -33,7 +33,10 @@ import { SuperadminModule } from './superadmin/superadmin.module'
 import { DashboardModule } from './admin/dashboard/dashboard.module'
 import { DiagnosticsModule } from './admin/diagnostics/diagnostics.module'
 import { PreschoolRecordModule } from './admin/preschool-record/preschool-record.module'
+import { PreschoolDimensionsModule } from './admin/preschool-dimensions/preschool-dimensions.module'
 import { MeetingsModule } from './admin/meetings/meetings.module'
+import { PreInformeReasonsModule } from './admin/pre-informe-reasons/pre-informe-reasons.module'
+import { IcfesResultsModule } from './admin/icfes-results/icfes-results.module'
 
 @Module({
   imports: [
@@ -81,7 +84,10 @@ import { MeetingsModule } from './admin/meetings/meetings.module'
     DashboardModule,
     DiagnosticsModule,
     PreschoolRecordModule,
+    PreschoolDimensionsModule,
     MeetingsModule,
+    PreInformeReasonsModule,
+    IcfesResultsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
