@@ -95,15 +95,23 @@ WHERE pi.school_id = g.school_id AND pi.dimension_id = g.dimension_id AND pi.cod
 --    SELECT count(*) FROM preschool_indicator_grades WHERE dimension_id IS NULL OR indicator_id IS NULL;
 
 -- 7. Forzar NOT NULL, eliminar columnas/constraints viejos, nuevos UNIQUE sobre los FKs
+-- El nombre del constraint único original de 028 varía según el entorno: si en
+-- algún momento se corrió `prisma db push` contra esa base, Prisma renombra el
+-- constraint a su convención (`<tabla>_enrollment_id_academic_period_id_key`) en
+-- vez del nombre explícito `uq_preschool_dim_grade`/`uq_preschool_ind_grade` que
+-- define 028.sql — se cubren ambos nombres para que esta migración sea segura en
+-- cualquiera de los dos casos.
 ALTER TABLE preschool_dimension_grades ALTER COLUMN dimension_id SET NOT NULL;
-ALTER TABLE preschool_dimension_grades DROP CONSTRAINT uq_preschool_dim_grade;
+ALTER TABLE preschool_dimension_grades DROP CONSTRAINT IF EXISTS uq_preschool_dim_grade;
+ALTER TABLE preschool_dimension_grades DROP CONSTRAINT IF EXISTS preschool_dimension_grades_enrollment_id_academic_period_id_key;
 ALTER TABLE preschool_dimension_grades DROP COLUMN dimension;
 ALTER TABLE preschool_dimension_grades
   ADD CONSTRAINT uq_preschool_dim_grade UNIQUE (enrollment_id, academic_period_id, dimension_id);
 
 ALTER TABLE preschool_indicator_grades ALTER COLUMN dimension_id SET NOT NULL;
 ALTER TABLE preschool_indicator_grades ALTER COLUMN indicator_id SET NOT NULL;
-ALTER TABLE preschool_indicator_grades DROP CONSTRAINT uq_preschool_ind_grade;
+ALTER TABLE preschool_indicator_grades DROP CONSTRAINT IF EXISTS uq_preschool_ind_grade;
+ALTER TABLE preschool_indicator_grades DROP CONSTRAINT IF EXISTS preschool_indicator_grades_enrollment_id_academic_period_id_key;
 ALTER TABLE preschool_indicator_grades DROP COLUMN dimension;
 ALTER TABLE preschool_indicator_grades DROP COLUMN indicator_key;
 ALTER TABLE preschool_indicator_grades
